@@ -16,7 +16,10 @@ interface DashboardData {
 @Component({
   selector: 'app-dashboard',
   template: `
-    <h1 class="font-heading text-2xl mb-4">Dashboard</h1>
+    <h1 class="font-heading text-2xl mb-1">Dashboard</h1>
+    <p *ngIf="hotelName" class="text-sm text-muted mb-3">
+      Hotel: {{ hotelName }}
+    </p>
     <app-loading-spinner [show]="loading"></app-loading-spinner>
     <div *ngIf="data && !loading">
       <div class="grid md:grid-cols-4 gap-4 mb-6">
@@ -76,9 +79,11 @@ interface DashboardData {
 export class DashboardComponent {
   data: DashboardData | null = null;
   loading = false;
+  hotelName: string | null = null;
 
   constructor(private http: HttpClient) {
     this.load();
+    this.loadHotelName();
   }
 
   private load(): void {
@@ -90,6 +95,17 @@ export class DashboardComponent {
       },
       error: () => {
         this.loading = false;
+      }
+    });
+  }
+
+  private loadHotelName(): void {
+    this.http.get<any>(`${environment.apiUrl}/auth/me`).subscribe({
+      next: (u) => {
+        this.hotelName = u.hotel_name || null;
+      },
+      error: () => {
+        this.hotelName = null;
       }
     });
   }

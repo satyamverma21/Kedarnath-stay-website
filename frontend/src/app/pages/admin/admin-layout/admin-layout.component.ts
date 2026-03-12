@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-admin-layout',
@@ -10,11 +11,13 @@ import { Component } from '@angular/core';
         </div>
         <nav class="mt-2 text-sm">
           <a routerLink="/admin/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
+          <a *ngIf="isSuperAdmin" routerLink="/admin/hotels" routerLinkActive="active">Hotels</a>
+          <a *ngIf="isSuperAdmin" routerLink="/admin/users" routerLinkActive="active">Users</a>
           <a routerLink="/admin/rooms" routerLinkActive="active">Rooms</a>
           <a routerLink="/admin/tents" routerLinkActive="active">Tents</a>
-          <a routerLink="/admin/price-settings" routerLinkActive="active">Price Settings</a>
-          <a routerLink="/admin/bookings" routerLinkActive="active">Bookings</a>
-          <a routerLink="/admin/enquiries" routerLinkActive="active">Enquiries</a>
+          <a *ngIf="isSuperAdmin" routerLink="/admin/price-settings" routerLinkActive="active">Price Settings</a>
+          <a *ngIf="isSuperAdmin" routerLink="/admin/bookings" routerLinkActive="active">Bookings</a>
+          <a *ngIf="isSuperAdmin" routerLink="/admin/enquiries" routerLinkActive="active">Enquiries</a>
         </nav>
       </aside>
       <main class="flex-1 bg-cream min-w-0">
@@ -25,5 +28,12 @@ import { Component } from '@angular/core';
     </div>
   `
 })
-export class AdminLayoutComponent {}
+export class AdminLayoutComponent {
+  constructor(private auth: AuthService) {}
+
+  get isSuperAdmin(): boolean {
+    const user = this.auth.getCurrentUser();
+    return !!user && user.role === 'admin';
+  }
+}
 

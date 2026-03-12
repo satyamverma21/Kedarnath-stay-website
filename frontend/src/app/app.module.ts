@@ -33,6 +33,10 @@ import { TentFormComponent } from './pages/admin/tent-form/tent-form.component';
 import { PriceSettingsComponent } from './pages/admin/price-settings/price-settings.component';
 import { BookingsListComponent } from './pages/admin/bookings-list/bookings-list.component';
 import { EnquiriesListComponent } from './pages/admin/enquiries-list/enquiries-list.component';
+import { UserFormComponent } from './pages/admin/user-form/user-form.component';
+import { ManageUsersComponent } from './pages/admin/manage-users/manage-users.component';
+import { HotelFormComponent } from './pages/admin/hotel-form/hotel-form.component';
+import { ManageHotelsComponent } from './pages/admin/manage-hotels/manage-hotels.component';
 
 @NgModule({
   declarations: [
@@ -61,7 +65,11 @@ import { EnquiriesListComponent } from './pages/admin/enquiries-list/enquiries-l
     TentFormComponent,
     PriceSettingsComponent,
     BookingsListComponent,
-    EnquiriesListComponent
+    EnquiriesListComponent,
+    ManageHotelsComponent,
+    HotelFormComponent,
+    ManageUsersComponent,
+    UserFormComponent
   ],
   imports: [
     BrowserModule,

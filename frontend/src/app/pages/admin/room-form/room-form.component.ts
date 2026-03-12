@@ -7,6 +7,7 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
 import { RoomService } from '../../../core/services/room.service';
 import { PropertyImage } from '../../../core/services/room.service';
 import { environment } from '../../../../environments/environment';
+import { AuthService } from '../../../core/services/auth.service';
 
 const MAX_IMAGES = 4;
 
@@ -21,6 +22,11 @@ interface AdminRoom {
   status: string;
 }
 
+interface AdminHotelOption {
+  id: number;
+  name: string;
+}
+
 @Component({
    selector: 'app-room-form',
    template: `
@@ -29,6 +35,16 @@ interface AdminRoom {
         {{ isEdit ? 'Edit Room' : 'Add Room' }}
       </h1>
       <form [formGroup]="form" (ngSubmit)="save()" class="card p-4 space-y-3 text-sm">
+        <div *ngIf="isSuperAdmin && !isEdit">
+          <label class="block text-xs uppercase mb-1 tracking-widest">Hotel</label>
+          <select formControlName="hotelId">
+            <option value="" disabled>Select hotel</option>
+            <option *ngFor="let h of hotels" [value]="h.id">{{ h.name }}</option>
+          </select>
+          <div class="text-xs text-red-600" *ngIf="submitted && form.get('hotelId')?.invalid">
+            Hotel is required.
+          </div>
+        </div>
         <div>
           <label class="block text-xs uppercase mb-1 tracking-widest">Name</label>
           <input type="text" formControlName="name" />
@@ -119,7 +135,8 @@ export class RoomFormComponent {
     capacity: [2, Validators.required],
     basePrice: [0, Validators.required],
     amenities: this.fb.array<string>([]),
-    status: ['active', Validators.required]
+    status: ['active', Validators.required],
+    hotelId: ['']
   });
   submitted = false;
   loading = false;
@@ -130,14 +147,25 @@ export class RoomFormComponent {
   imageError = '';
   uploadingImages = false;
   selectedFiles: File[] = [];
+  hotels: AdminHotelOption[] = [];
+  isSuperAdmin = false;
 
   constructor(
     private fb: FormBuilder,
     private route: ActivatedRoute,
     private http: HttpClient,
     private router: Router,
-    private roomService: RoomService
+    private roomService: RoomService,
+    private auth: AuthService
   ) {
+    const user = this.auth.getCurrentUser();
+    this.isSuperAdmin = !!user && user.role === 'admin';
+    if (this.isSuperAdmin) {
+      this.loadHotels();
+      const hotelCtrl = this.form.get('hotelId');
+      hotelCtrl?.addValidators(Validators.required);
+      hotelCtrl?.updateValueAndValidity();
+    }
     this.route.paramMap.subscribe((params) => {
       const idParam = params.get('id');
       if (idParam) {
@@ -149,6 +177,13 @@ export class RoomFormComponent {
     if (!this.isEdit) {
       this.addAmenity();
     }
+  }
+
+  private loadHotels(): void {
+    this.http.get<AdminHotelOption[]>(`${environment.apiUrl}/admin/hotels`).subscribe({
+      next: (hotels) => (this.hotels = hotels),
+      error: () => {}
+    });
   }
 
   get amenities(): FormArray {
@@ -204,11 +239,13 @@ export class RoomFormComponent {
   }
 
   uploadImages(): void {
+    
     if (!this.id || !this.selectedFiles.length) return;
     this.imageError = '';
     this.uploadingImages = true;
     const formData = new FormData();
     this.selectedFiles.forEach((f) => formData.append('images', f));
+    debugger;
     this.http.post<{ id: number; image_path: string; is_primary: number }[]>(`${environment.apiUrl}/admin/rooms/${this.id}/images`, formData).subscribe({
       next: () => {
         this.selectedFiles = [];
@@ -254,10 +291,16 @@ export class RoomFormComponent {
     if (this.form.invalid) {
       return;
     }
-    const payload = {
+    const payload: any = {
       ...this.form.value,
       amenities: this.amenities.value.filter((a: string) => !!a)
     };
+
+    if (!this.isEdit && this.isSuperAdmin) {
+      payload.hotelId = this.form.value.hotelId ? Number(this.form.value.hotelId) : null;
+    } else {
+      delete payload.hotelId;
+    }
     this.loading = true;
     const req = this.isEdit && this.id
       ? this.http.put(`${environment.apiUrl}/admin/rooms/${this.id}`, payload)

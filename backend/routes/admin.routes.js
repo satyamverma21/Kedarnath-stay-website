@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { verifyToken, requireAdmin } = require('../middleware/auth.middleware');
+const { verifyToken, requireAdmin, requireAdminOrHotelAdmin } = require('../middleware/auth.middleware');
 const { upload } = require('../middleware/upload.middleware');
 const adminController = require('../controllers/admin.controller');
 
-router.use(verifyToken, requireAdmin);
+router.use(verifyToken);
 
 function handleUpload(maxCount) {
   return (req, res, next) => {
@@ -23,35 +23,50 @@ function handleUpload(maxCount) {
   };
 }
 
-router.get('/dashboard', adminController.getDashboard);
+router.get('/dashboard', requireAdmin, adminController.getDashboard);
 
-router.get('/rooms', adminController.listRooms);
-router.post('/rooms', adminController.createRoom);
-router.put('/rooms/:id', adminController.updateRoom);
-router.delete('/rooms/:id', adminController.deleteRoom);
-router.post('/rooms/:id/images', handleUpload(4), adminController.uploadRoomImages);
-router.delete('/rooms/:id/images/:imageId', adminController.deleteRoomImage);
-router.put('/rooms/:id/images/:imageId/primary', adminController.setPrimaryRoomImage);
+// Hotel master (super admin only)
+router.get('/hotels', requireAdmin, adminController.listHotels);
+router.post('/hotels', requireAdmin, adminController.createHotel);
+router.put('/hotels/:id', requireAdmin, adminController.updateHotel);
+router.delete('/hotels/:id', requireAdmin, adminController.deleteHotel);
 
-router.get('/tents', adminController.listTents);
-router.post('/tents', adminController.createTent);
-router.put('/tents/:id', adminController.updateTent);
-router.delete('/tents/:id', adminController.deleteTent);
-router.post('/tents/:id/images', handleUpload(4), adminController.uploadTentImages);
-router.delete('/tents/:id/images/:imageId', adminController.deleteTentImage);
-router.put('/tents/:id/images/:imageId/primary', adminController.setPrimaryTentImage);
+// User master (super admin only)
+router.get('/users', requireAdmin, adminController.listUsers);
+router.post('/users', requireAdmin, adminController.createUser);
+router.put('/users/:id', requireAdmin, adminController.updateUser);
+router.delete('/users/:id', requireAdmin, adminController.deleteUser);
 
-router.get('/bookings', adminController.listAdminBookings);
-router.put('/bookings/:id/status', adminController.updateBookingStatus);
+// Rooms (admin + hotel-admin, hotel scoped in controller)
+router.get('/rooms', requireAdminOrHotelAdmin, adminController.listRooms);
+router.post('/rooms', requireAdminOrHotelAdmin, adminController.createRoom);
+router.put('/rooms/:id', requireAdminOrHotelAdmin, adminController.updateRoom);
+router.delete('/rooms/:id', requireAdminOrHotelAdmin, adminController.deleteRoom);
+router.post('/rooms/:id/images', requireAdminOrHotelAdmin, handleUpload(4), adminController.uploadRoomImages);
+router.delete('/rooms/:id/images/:imageId', requireAdminOrHotelAdmin, adminController.deleteRoomImage);
+router.put('/rooms/:id/images/:imageId/primary', requireAdminOrHotelAdmin, adminController.setPrimaryRoomImage);
 
-router.get('/price-settings', adminController.listPriceSettings);
-router.post('/price-settings', adminController.createPriceSetting);
-router.put('/price-settings/:id', adminController.updatePriceSetting);
-router.delete('/price-settings/:id', adminController.deletePriceSetting);
+// Tents (admin + hotel-admin, hotel scoped in controller)
+router.get('/tents', requireAdminOrHotelAdmin, adminController.listTents);
+router.post('/tents', requireAdminOrHotelAdmin, adminController.createTent);
+router.put('/tents/:id', requireAdminOrHotelAdmin, adminController.updateTent);
+router.delete('/tents/:id', requireAdminOrHotelAdmin, adminController.deleteTent);
+router.post('/tents/:id/images', requireAdminOrHotelAdmin, handleUpload(4), adminController.uploadTentImages);
+router.delete('/tents/:id/images/:imageId', requireAdminOrHotelAdmin, adminController.deleteTentImage);
+router.put('/tents/:id/images/:imageId/primary', requireAdminOrHotelAdmin, adminController.setPrimaryTentImage);
 
-router.get('/enquiries', adminController.listEnquiries);
-router.put('/enquiries/:id/status', adminController.updateEnquiryStatus);
-router.delete('/enquiries/:id', adminController.deleteEnquiry);
+// Other admin-only sections
+router.get('/bookings', requireAdmin, adminController.listAdminBookings);
+router.put('/bookings/:id/status', requireAdmin, adminController.updateBookingStatus);
+
+router.get('/price-settings', requireAdmin, adminController.listPriceSettings);
+router.post('/price-settings', requireAdmin, adminController.createPriceSetting);
+router.put('/price-settings/:id', requireAdmin, adminController.updatePriceSetting);
+router.delete('/price-settings/:id', requireAdmin, adminController.deletePriceSetting);
+
+router.get('/enquiries', requireAdmin, adminController.listEnquiries);
+router.put('/enquiries/:id/status', requireAdmin, adminController.updateEnquiryStatus);
+router.delete('/enquiries/:id', requireAdmin, adminController.deleteEnquiry);
 
 module.exports = router;
 

@@ -8,7 +8,8 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
-  role: 'customer' | 'admin';
+  role: 'customer' | 'admin' | 'hotel-admin';
+  hotelId?: number | null;
 }
 
 interface AuthResponse {
@@ -22,9 +23,9 @@ export class AuthService {
 
   constructor(private http: HttpClient) {}
 
-  login(email: string, password: string): Observable<User> {
+  login(phone: string, password: string): Observable<User> {
     return this.http
-      .post<AuthResponse>(`${environment.apiUrl}/auth/login`, { email, password })
+      .post<AuthResponse>(`${environment.apiUrl}/auth/login`, { phone, password })
       .pipe(
         tap((res) => this.setToken(res.token)),
         map((res) => res.user)
@@ -33,7 +34,7 @@ export class AuthService {
 
   register(payload: {
     name: string;
-    email: string;
+    email?: string;
     password: string;
     phone?: string;
   }): Observable<User> {
@@ -76,7 +77,8 @@ export class AuthService {
         id: payload.id,
         name: payload.name,
         email: payload.email,
-        role: payload.role
+        role: payload.role,
+        hotelId: payload.hotelId ?? null
       };
     } catch {
       return null;
@@ -85,7 +87,7 @@ export class AuthService {
 
   isAdmin(): boolean {
     const user = this.getCurrentUser();
-    return !!user && user.role === 'admin';
+    return !!user && (user.role === 'admin' || user.role === 'hotel-admin');
   }
 }
 

@@ -12,7 +12,19 @@ body {
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
-  min-height: 720px;
+  min-height: 330px;
+}
+
+.auth-cover {
+  background-image: url('assets/image/background.jpeg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
 }
 
 button:not(.no-style) {

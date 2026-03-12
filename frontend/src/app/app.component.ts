@@ -35,7 +35,8 @@ export class AppComponent {
     this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
       .subscribe((event) => {
-        this.isAdmin = event.urlAfterRedirects.startsWith('/admin');
+        const url = event.urlAfterRedirects;
+        this.isAdmin = url.startsWith('/admin') || url.startsWith('/login') || url.startsWith('/register');
       });
   }
 }

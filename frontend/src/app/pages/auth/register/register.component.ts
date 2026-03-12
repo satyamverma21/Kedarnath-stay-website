@@ -9,7 +9,8 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
  
   selector: 'app-register',
   template: `
-    <section class="max-w-md mx-auto px-4 sm:px-6 py-10 sm:py-14">
+    <div class="auth-cover">
+    <section class="max-w-md w-full">
       <h1 class="font-heading text-2xl sm:text-3xl text-dark mb-6">Create account</h1>
       <form [formGroup]="form" (ngSubmit)="register()" class="card p-5 sm:p-6 space-y-4">
         <div>
@@ -20,15 +21,21 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
           </div>
         </div>
         <div>
-          <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Email</label>
+          <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Email (optional)</label>
           <input type="email" formControlName="email" class="w-full" />
-          <div class="text-xs text-red-600 mt-1" *ngIf="submitted && form.get('email')?.invalid">
-            Valid email is required.
+          <div
+            class="text-xs text-red-600 mt-1"
+            *ngIf="submitted && form.get('email')?.value && form.get('email')?.invalid"
+          >
+            Please enter a valid email.
           </div>
         </div>
         <div>
           <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Phone</label>
           <input type="tel" formControlName="phone" class="w-full" />
+          <div class="text-xs text-red-600 mt-1" *ngIf="submitted && form.get('phone')?.invalid">
+            Phone is required.
+          </div>
         </div>
         <div>
           <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Password</label>
@@ -48,13 +55,14 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
       </form>
       <app-loading-spinner [show]="loading"></app-loading-spinner>
     </section>
+    </div>
   `
 })
 export class RegisterComponent {
   form = this.fb.group({
     name: ['', Validators.required],
-    email: ['', [Validators.required, Validators.email]],
-    phone: [''],
+    email: ['', [Validators.email]],
+    phone: ['', [Validators.required]],
     password: ['', [Validators.required, Validators.minLength(6)]]
   });
   submitted = false;
@@ -74,13 +82,24 @@ export class RegisterComponent {
       return;
     }
     this.loading = true;
+    const { name, email, phone, password } = this.form.value;
+    const payload: {
+      name: string;
+      password: string;
+      phone: string;
+      email?: string;
+    } = {
+      name: name!,
+      password: password!,
+      phone: phone!
+    };
+
+    if (email) {
+      payload.email = email;
+    }
+
     this.auth
-      .register({
-        name: this.form.value.name!,
-        email: this.form.value.email!,
-        password: this.form.value.password!,
-        phone: this.form.value.phone || undefined
-      })
+      .register(payload)
       .subscribe({
         next: () => {
           this.loading = false;

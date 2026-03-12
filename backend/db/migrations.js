@@ -4,6 +4,14 @@ function runMigrations() {
   const db = getDb();
 
   db.exec(`
+    CREATE TABLE IF NOT EXISTS hotels (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      city TEXT,
+      status TEXT DEFAULT 'active',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -106,19 +114,63 @@ function runMigrations() {
       status TEXT DEFAULT 'new',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS phone_verifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      phone TEXT NOT NULL,
+      otp TEXT NOT NULL,
+      expires_at DATETIME NOT NULL,
+      verified INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
+
+  // Add hotel_id column to users table if it doesn't exist yet
+  const userColumns = db.prepare('PRAGMA table_info(users)').all();
+  const hasHotelId = userColumns.some((col) => col.name === 'hotel_id');
+  if (!hasHotelId) {
+    db.exec('ALTER TABLE users ADD COLUMN hotel_id INTEGER REFERENCES hotels(id);');
+  }
+
+  // Add hotel_id column to rooms table if it doesn't exist yet
+  const roomColumns = db.prepare('PRAGMA table_info(rooms)').all();
+  const roomHasHotelId = roomColumns.some((col) => col.name === 'hotel_id');
+  if (!roomHasHotelId) {
+    db.exec('ALTER TABLE rooms ADD COLUMN hotel_id INTEGER REFERENCES hotels(id);');
+  }
+
+  // Add hotel_id column to tents table if it doesn't exist yet
+  const tentColumns = db.prepare('PRAGMA table_info(tents)').all();
+  const tentHasHotelId = tentColumns.some((col) => col.name === 'hotel_id');
+  if (!tentHasHotelId) {
+    db.exec('ALTER TABLE tents ADD COLUMN hotel_id INTEGER REFERENCES hotels(id);');
+  }
 
   seedInitialData(db);
 }
 
 function seedInitialData(db) {
+  // Ensure at least one hotel exists so we can attach the initial admin
+  let defaultHotelId = null;
+  const hotelCount = db.prepare('SELECT COUNT(*) as count FROM hotels').get().count;
+  if (hotelCount === 0) {
+    const info = db
+      .prepare('INSERT INTO hotels (name, city, status) VALUES (?, ?, ?)')
+      .run('Main Hotel', null, 'active');
+    defaultHotelId = info.lastInsertRowid;
+  } else {
+    const row = db.prepare('SELECT id FROM hotels ORDER BY id LIMIT 1').get();
+    defaultHotelId = row ? row.id : null;
+  }
+
   const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
   if (userCount === 0) {
     const bcrypt = require('bcryptjs');
-    const passwordHash = bcrypt.hashSync('admin123', 10);
+    const passwordHash = bcrypt.hashSync('admin', 10);
     db.prepare(
-      'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)'
-    ).run('Admin', 'admin@hotel.com', passwordHash, 'admin');
+      'INSERT INTO users (name, email, phone, password_hash, role, hotel_id) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run('Admin', 'admin@admin.com','9999999999', passwordHash, 'admin', defaultHotelId);
   }
 
   const roomCount = db.prepare('SELECT COUNT(*) as count FROM rooms').get().count;

@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const { getDb } = require('../db/database');
 const { MAX_IMAGES_PER_PROPERTY } = require('../middleware/upload.middleware');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 function getTodayDateString() {
@@ -70,10 +71,288 @@ async function getDashboard(req, res) {
   }
 }
 
-async function listRooms(req, res) {
+// HOTEL MASTER
+
+async function listHotels(req, res) {
   try {
     const db = getDb();
-    const rooms = db.prepare('SELECT * FROM rooms').all();
+    const hotels = db.prepare('SELECT * FROM hotels ORDER BY name').all();
+    return res.json(hotels);
+  } catch (err) {
+    console.error('Admin list hotels error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+async function createHotel(req, res) {
+  try {
+    const { name, city, status } = req.body;
+    if (!name) {
+      return res.status(400).json({ message: 'Hotel name is required' });
+    }
+    const db = getDb();
+    const stmt = db.prepare(
+      `INSERT INTO hotels (name, city, status)
+       VALUES (?, ?, ?)`
+    );
+    const info = stmt.run(name, city || null, status || 'active');
+    const hotel = db.prepare('SELECT * FROM hotels WHERE id = ?').get(info.lastInsertRowid);
+    return res.status(201).json(hotel);
+  } catch (err) {
+    console.error('Admin create hotel error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+async function updateHotel(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const { name, city, status } = req.body;
+    const db = getDb();
+    const existing = db.prepare('SELECT * FROM hotels WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({ message: 'Hotel not found' });
+    }
+    db.prepare(
+      `UPDATE hotels
+       SET name = ?, city = ?, status = ?
+       WHERE id = ?`
+    ).run(
+      name || existing.name,
+      city !== undefined ? city : existing.city,
+      status || existing.status,
+      id
+    );
+    const hotel = db.prepare('SELECT * FROM hotels WHERE id = ?').get(id);
+    return res.json(hotel);
+  } catch (err) {
+    console.error('Admin update hotel error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+async function deleteHotel(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const db = getDb();
+    const existing = db.prepare('SELECT * FROM hotels WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({ message: 'Hotel not found' });
+    }
+
+    // Optional safety: prevent deleting a hotel that still has users
+    const userCount = db
+      .prepare('SELECT COUNT(*) as c FROM users WHERE hotel_id = ?')
+      .get(id).c;
+    if (userCount > 0) {
+      return res
+        .status(400)
+        .json({ message: 'Cannot delete hotel with associated users. Move or remove users first.' });
+    }
+
+    db.prepare('DELETE FROM hotels WHERE id = ?').run(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Admin delete hotel error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+// USER MASTER (HOTEL-WISE)
+
+async function listUsers(req, res) {
+  try {
+    const { hotelId, id } = req.query;
+    const db = getDb();
+    let query = `SELECT u.id, u.name, u.email, u.phone, u.role, u.hotel_id, h.name as hotel_name
+                 FROM users u
+                 LEFT JOIN hotels h ON h.id = u.hotel_id
+                 WHERE 1 = 1`;
+    const params = [];
+
+    if (id) {
+      query += ' AND u.id = ?';
+      params.push(Number(id));
+    }
+    if (hotelId) {
+      query += ' AND u.hotel_id = ?';
+      params.push(Number(hotelId));
+    }
+
+    query += ' ORDER BY u.name';
+    const users = db.prepare(query).all(...params);
+    return res.json(users);
+  } catch (err) {
+    console.error('Admin list users error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+async function createUser(req, res) {
+  try {
+    const { name, email, phone, password, role, hotelId } = req.body;
+    if (!name || !phone || !password) {
+      return res
+        .status(400)
+        .json({ message: 'Name, phone and password are required' });
+    }
+
+    const db = getDb();
+
+    const existingByPhone = db.prepare('SELECT id FROM users WHERE phone = ?').get(phone);
+    if (existingByPhone) {
+      return res.status(400).json({ message: 'Phone is already registered' });
+    }
+    if (email) {
+      const existingByEmail = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+      if (existingByEmail) {
+        return res.status(400).json({ message: 'Email is already registered' });
+      }
+    }
+
+    const storedEmail = email || `user_${phone}@auto.local`;
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const stmt = db.prepare(
+      `INSERT INTO users (name, email, password_hash, phone, role, hotel_id)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    );
+
+    const finalRole = role || 'admin';
+    let finalHotelId = null;
+    if (finalRole === 'hotel-admin') {
+      if (!hotelId) {
+        return res
+          .status(400)
+          .json({ message: 'Hotel is required for hotel-admin users' });
+      }
+      finalHotelId = Number(hotelId);
+    }
+
+    const info = stmt.run(
+      name,
+      storedEmail,
+      passwordHash,
+      phone,
+      finalRole,
+      finalHotelId
+    );
+
+    const user = db
+      .prepare(
+        `SELECT u.id, u.name, u.email, u.phone, u.role, u.hotel_id, h.name as hotel_name
+         FROM users u
+         LEFT JOIN hotels h ON h.id = u.hotel_id
+         WHERE u.id = ?`
+      )
+      .get(info.lastInsertRowid);
+
+    return res.status(201).json(user);
+  } catch (err) {
+    console.error('Admin create user error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+async function updateUser(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const { name, email, phone, password, role, hotelId } = req.body;
+    const db = getDb();
+    const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Update unique fields if they are changing
+    if (phone && phone !== existing.phone) {
+      const existingByPhone = db.prepare('SELECT id FROM users WHERE phone = ?').get(phone);
+      if (existingByPhone) {
+        return res.status(400).json({ message: 'Phone is already registered' });
+      }
+    }
+    if (email && email !== existing.email) {
+      const existingByEmail = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+      if (existingByEmail) {
+        return res.status(400).json({ message: 'Email is already registered' });
+      }
+    }
+
+    let passwordHash = existing.password_hash;
+    if (password) {
+      passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    db.prepare(
+      `UPDATE users
+       SET name = ?, email = ?, phone = ?, role = ?, hotel_id = ?, password_hash = ?
+       WHERE id = ?`
+    ).run(
+      name || existing.name,
+      email || existing.email,
+      phone || existing.phone,
+      role || existing.role,
+      hotelId !== undefined ? Number(hotelId) : existing.hotel_id,
+      passwordHash,
+      id
+    );
+
+    const user = db
+      .prepare(
+        `SELECT u.id, u.name, u.email, u.phone, u.role, u.hotel_id, h.name as hotel_name
+         FROM users u
+         LEFT JOIN hotels h ON h.id = u.hotel_id
+         WHERE u.id = ?`
+      )
+      .get(id);
+
+    return res.json(user);
+  } catch (err) {
+    console.error('Admin update user error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+async function deleteUser(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const db = getDb();
+    const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Admin delete user error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+async function listRooms(req, res) {
+  try {
+    const { hotelId } = req.query;
+    const db = getDb();
+    let query = `SELECT r.*, h.name as hotel_name
+                 FROM rooms r
+                 LEFT JOIN hotels h ON h.id = r.hotel_id
+                 WHERE 1 = 1`;
+    const params = [];
+
+    // If caller is hotel-admin, force filter to their hotel
+    if (req.user.role === 'hotel-admin') {
+      if (!req.user.hotelId) {
+        return res.status(400).json({ message: 'Hotel not assigned to this user' });
+      }
+      query += ' AND r.hotel_id = ?';
+      params.push(req.user.hotelId);
+    } else if (hotelId) {
+      query += ' AND r.hotel_id = ?';
+      params.push(Number(hotelId));
+    }
+
+    const rooms = db.prepare(query).all(...params);
     return res.json(rooms);
   } catch (err) {
     console.error('Admin list rooms error', err);
@@ -83,16 +362,30 @@ async function listRooms(req, res) {
 
 async function createRoom(req, res) {
   try {
-    const { name, type, description, capacity, basePrice, amenities, status } = req.body;
+    const { name, type, description, capacity, basePrice, amenities, status, hotelId } = req.body;
     if (!name || !type || !basePrice) {
       return res
         .status(400)
         .json({ message: 'Name, type and basePrice are required for a room' });
     }
     const db = getDb();
+
+    let effectiveHotelId = null;
+    if (req.user.role === 'hotel-admin') {
+      if (!req.user.hotelId) {
+        return res.status(400).json({ message: 'Hotel not assigned to this user' });
+      }
+      effectiveHotelId = req.user.hotelId;
+    } else {
+      if (!hotelId) {
+        return res.status(400).json({ message: 'hotelId is required for creating a room' });
+      }
+      effectiveHotelId = Number(hotelId);
+    }
+
     const stmt = db.prepare(
-      `INSERT INTO rooms (name, type, description, capacity, basePrice, amenities, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO rooms (name, type, description, capacity, basePrice, amenities, status, hotel_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     );
     const info = stmt.run(
       name,
@@ -101,7 +394,8 @@ async function createRoom(req, res) {
       capacity || 2,
       basePrice,
       amenities ? JSON.stringify(amenities) : null,
-      status || 'active'
+      status || 'active',
+      effectiveHotelId
     );
     const room = db.prepare('SELECT * FROM rooms WHERE id = ?').get(info.lastInsertRowid);
     return res.status(201).json(room);
@@ -119,6 +413,13 @@ async function updateRoom(req, res) {
     const existing = db.prepare('SELECT * FROM rooms WHERE id = ?').get(id);
     if (!existing) {
       return res.status(404).json({ message: 'Room not found' });
+    }
+
+    // Hotel-admins may only modify rooms for their own hotel
+    if (req.user.role === 'hotel-admin') {
+      if (!req.user.hotelId || existing.hotel_id !== req.user.hotelId) {
+        return res.status(403).json({ message: 'Not allowed to modify rooms of another hotel' });
+      }
     }
     const stmt = db.prepare(
       `UPDATE rooms SET 
@@ -152,6 +453,12 @@ async function deleteRoom(req, res) {
     if (!existing) {
       return res.status(404).json({ message: 'Room not found' });
     }
+
+    if (req.user.role === 'hotel-admin') {
+      if (!req.user.hotelId || existing.hotel_id !== req.user.hotelId) {
+        return res.status(403).json({ message: 'Not allowed to delete rooms of another hotel' });
+      }
+    }
     db.prepare('DELETE FROM rooms WHERE id = ?').run(id);
     return res.json({ success: true });
   } catch (err) {
@@ -168,6 +475,11 @@ async function uploadRoomImages(req, res) {
     if (!room) {
       return res.status(404).json({ message: 'Room not found' });
     }
+    if (req.user.role === 'hotel-admin') {
+      if (!req.user.hotelId || room.hotel_id !== req.user.hotelId) {
+        return res.status(403).json({ message: 'Not allowed to manage images of another hotel' });
+      }
+    }
     if (!req.files || !req.files.length) {
       return res.status(400).json({ message: 'No images uploaded' });
     }
@@ -179,8 +491,9 @@ async function uploadRoomImages(req, res) {
         message: `Maximum ${MAX_IMAGES_PER_PROPERTY} images per room. Remove an image to add more.`
       });
     }
+    debugger
     const filesToAdd = req.files.slice(0, slotsLeft);
-
+    console.log(req.files)
     const insert = db.prepare(
       'INSERT INTO room_images (room_id, image_path, is_primary) VALUES (?, ?, ?)'
     );
@@ -262,8 +575,26 @@ async function setPrimaryRoomImage(req, res) {
 
 async function listTents(req, res) {
   try {
+    const { hotelId } = req.query;
     const db = getDb();
-    const tents = db.prepare('SELECT * FROM tents').all();
+    let query = `SELECT t.*, h.name as hotel_name
+                 FROM tents t
+                 LEFT JOIN hotels h ON h.id = t.hotel_id
+                 WHERE 1 = 1`;
+    const params = [];
+
+    if (req.user.role === 'hotel-admin') {
+      if (!req.user.hotelId) {
+        return res.status(400).json({ message: 'Hotel not assigned to this user' });
+      }
+      query += ' AND t.hotel_id = ?';
+      params.push(req.user.hotelId);
+    } else if (hotelId) {
+      query += ' AND t.hotel_id = ?';
+      params.push(Number(hotelId));
+    }
+
+    const tents = db.prepare(query).all(...params);
     return res.json(tents);
   } catch (err) {
     console.error('Admin list tents error', err);
@@ -273,7 +604,7 @@ async function listTents(req, res) {
 
 async function createTent(req, res) {
   try {
-    const { name, type, description, capacity, basePrice, amenities, status } = req.body;
+    const { name, type, description, capacity, basePrice, amenities, status, hotelId } = req.body;
     
     if (!name || !type || !basePrice) {
       return res
@@ -281,9 +612,23 @@ async function createTent(req, res) {
         .json({ message: 'Name, type and basePrice are required for a tent' });
     }
     const db = getDb();
+
+    let effectiveHotelId = null;
+    if (req.user.role === 'hotel-admin') {
+      if (!req.user.hotelId) {
+        return res.status(400).json({ message: 'Hotel not assigned to this user' });
+      }
+      effectiveHotelId = req.user.hotelId;
+    } else {
+      if (!hotelId) {
+        return res.status(400).json({ message: 'hotelId is required for creating a tent' });
+      }
+      effectiveHotelId = Number(hotelId);
+    }
+
     const stmt = db.prepare(
-      `INSERT INTO tents (name, type, description, capacity, basePrice, amenities, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO tents (name, type, description, capacity, basePrice, amenities, status, hotel_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     );
     const info = stmt.run(
       name,
@@ -292,7 +637,8 @@ async function createTent(req, res) {
       capacity || 2,
       basePrice,
       amenities ? JSON.stringify(amenities) : null,
-      status || 'active'
+      status || 'active',
+      effectiveHotelId
     );
     const tent = db.prepare('SELECT * FROM tents WHERE id = ?').get(info.lastInsertRowid);
     return res.status(201).json(tent);
@@ -310,6 +656,12 @@ async function updateTent(req, res) {
     const existing = db.prepare('SELECT * FROM tents WHERE id = ?').get(id);
     if (!existing) {
       return res.status(404).json({ message: 'Tent not found' });
+    }
+
+    if (req.user.role === 'hotel-admin') {
+      if (!req.user.hotelId || existing.hotel_id !== req.user.hotelId) {
+        return res.status(403).json({ message: 'Not allowed to modify tents of another hotel' });
+      }
     }
     const stmt = db.prepare(
       `UPDATE tents SET 
@@ -343,6 +695,12 @@ async function deleteTent(req, res) {
     if (!existing) {
       return res.status(404).json({ message: 'Tent not found' });
     }
+
+    if (req.user.role === 'hotel-admin') {
+      if (!req.user.hotelId || existing.hotel_id !== req.user.hotelId) {
+        return res.status(403).json({ message: 'Not allowed to delete tents of another hotel' });
+      }
+    }
     db.prepare('DELETE FROM tents WHERE id = ?').run(id);
     return res.json({ success: true });
   } catch (err) {
@@ -358,6 +716,11 @@ async function uploadTentImages(req, res) {
     const tent = db.prepare('SELECT * FROM tents WHERE id = ?').get(tentId);
     if (!tent) {
       return res.status(404).json({ message: 'Tent not found' });
+    }
+    if (req.user.role === 'hotel-admin') {
+      if (!req.user.hotelId || tent.hotel_id !== req.user.hotelId) {
+        return res.status(403).json({ message: 'Not allowed to manage images of another hotel' });
+      }
     }
     if (!req.files || !req.files.length) {
       return res.status(400).json({ message: 'No images uploaded' });
@@ -669,6 +1032,14 @@ module.exports = {
   uploadTentImages,
   deleteTentImage,
   setPrimaryTentImage,
+  listHotels,
+  createHotel,
+  updateHotel,
+  deleteHotel,
+  listUsers,
+  createUser,
+  updateUser,
+  deleteUser,
   listAdminBookings,
   updateBookingStatus,
   listPriceSettings,

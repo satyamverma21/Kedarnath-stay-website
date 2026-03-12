@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { AuthGuard } from './core/guards/auth.guard';
+import { AdminGuard } from './core/guards/admin.guard';
 
 import { HomeComponent } from './pages/home/home.component';
 import { RoomSearchComponent } from './pages/room-search/room-search.component';
@@ -22,6 +23,10 @@ import { TentFormComponent } from './pages/admin/tent-form/tent-form.component';
 import { PriceSettingsComponent } from './pages/admin/price-settings/price-settings.component';
 import { BookingsListComponent } from './pages/admin/bookings-list/bookings-list.component';
 import { EnquiriesListComponent } from './pages/admin/enquiries-list/enquiries-list.component';
+import { ManageHotelsComponent } from './pages/admin/manage-hotels/manage-hotels.component';
+import { HotelFormComponent } from './pages/admin/hotel-form/hotel-form.component';
+import { ManageUsersComponent } from './pages/admin/manage-users/manage-users.component';
+import { UserFormComponent } from './pages/admin/user-form/user-form.component';
 
 const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -54,8 +59,15 @@ const routes: Routes = [
   {
     path: 'admin',
     component: AdminLayoutComponent,
+    canActivate: [AdminGuard],
     children: [
       { path: 'dashboard', component: DashboardComponent },
+      { path: 'hotels', component: ManageHotelsComponent },
+      { path: 'hotels/new', component: HotelFormComponent },
+      { path: 'hotels/:id/edit', component: HotelFormComponent },
+      { path: 'users', component: ManageUsersComponent },
+      { path: 'users/new', component: UserFormComponent },
+      { path: 'users/:id/edit', component: UserFormComponent },
       { path: 'rooms', component: ManageRoomsComponent },
       { path: 'rooms/new', component: RoomFormComponent },
       { path: 'rooms/:id/edit', component: RoomFormComponent },

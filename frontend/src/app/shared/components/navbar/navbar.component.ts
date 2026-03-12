@@ -32,7 +32,10 @@ import { AuthService } from '../../../core/services/auth.service';
           <a routerLink="/enquiry" routerLinkActive="text-forest font-medium" class="hover:text-forest px-4 py-3 md:py-0 border-b md:border-0 border-sand/50" (click)="menuOpen = false">Enquiry</a>
           <a *ngIf="isLoggedIn" routerLink="/my-bookings" routerLinkActive="text-forest font-medium" class="hover:text-forest px-4 py-3 md:py-0 border-b md:border-0 border-sand/50" (click)="menuOpen = false">My Bookings</a>
           <a *ngIf="isAdmin" routerLink="/admin/dashboard" routerLinkActive="text-forest font-medium" class="hover:text-forest px-4 py-3 md:py-0 border-b md:border-0 border-sand/50" (click)="menuOpen = false">Admin</a>
-          <div class="p-3 md:p-0 flex flex-col md:flex-row gap-2 md:gap-3">
+          <div class="p-3 md:p-0 flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+            <span *ngIf="isLoggedIn" class="text-muted text-sm px-4 py-2 md:py-0 md:px-0">
+              Hi, <span class="text-dark font-medium">{{ userName }}</span>
+            </span>
             <button *ngIf="!isLoggedIn" class="btn-primary text-xs w-full md:w-auto" routerLink="/login" (click)="menuOpen = false">Login</button>
             <button *ngIf="isLoggedIn" class="btn-gold text-xs w-full md:w-auto" (click)="logout()">Logout</button>
           </div>
@@ -51,6 +54,11 @@ export class NavbarComponent {
 
   get isAdmin(): boolean {
     return this.auth.isAdmin();
+  }
+
+  get userName(): string {
+    const user = this.auth.getCurrentUser();
+    return user?.name ?? '';
   }
 
   logout(): void {

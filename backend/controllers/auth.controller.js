@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { getDb } = require('../db/database');
+const { sendWhatsappOtp } = require('../utils/whatsapp');
 require('dotenv').config();
 
 function validateEmail(email) {
@@ -11,10 +12,11 @@ async function register(req, res) {
   try {
     const { name, email, password, phone } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Name, email and password are required' });
+    if (!name || !phone || !password) {
+      return res.status(400).json({ message: 'Name, phone and password are required' });
     }
-    if (!validateEmail(email)) {
+
+    if (email && !validateEmail(email)) {
       return res.status(400).json({ message: 'Invalid email format' });
     }
     if (password.length < 6) {
@@ -22,23 +24,54 @@ async function register(req, res) {
     }
 
     const db = getDb();
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-    if (existing) {
-      return res.status(400).json({ message: 'Email is already registered' });
+
+    // Ensure email (if provided) and phone are unique
+    if (email) {
+      const existingByEmail = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+      if (existingByEmail) {
+        return res.status(400).json({ message: 'Email is already registered' });
+      }
     }
+
+    const existingByPhone = db.prepare('SELECT id FROM users WHERE phone = ?').get(phone);
+    if (existingByPhone) {
+      return res.status(400).json({ message: 'Phone is already registered' });
+    }
+
+    // Email column is NOT NULL in schema; generate a placeholder if user didn't provide one
+    const storedEmail = email || `user_${phone}@auto.local`;
 
     const passwordHash = await bcrypt.hash(password, 10);
     const stmt = db.prepare(
-      'INSERT INTO users (name, email, password_hash, phone, role) VALUES (?, ?, ?, ?, ?)'
+      'INSERT INTO users (name, email, password_hash, phone, role, hotel_id) VALUES (?, ?, ?, ?, ?, ?)'
     );
-    const info = stmt.run(name, email, passwordHash, phone || null, 'customer');
 
-    const user = db.prepare('SELECT id, name, email, phone, role FROM users WHERE id = ?').get(
+    // Public registration users are not tied to a specific hotel by default
+    const info = stmt.run(name, storedEmail, passwordHash, phone || null, 'customer', null);
+
+    const user = db.prepare('SELECT id, name, email, phone, role, hotel_id FROM users WHERE id = ?').get(
       info.lastInsertRowid
     );
 
+    // Generate and store OTP for phone verification
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    db.prepare(
+      "INSERT INTO phone_verifications (user_id, phone, otp, expires_at, verified) VALUES (?, ?, ?, datetime('now', '+10 minutes'), 0)"
+    ).run(user.id, phone, otp);
+
+    // Fire-and-forget WhatsApp send (do not block registration on failures)
+    sendWhatsappOtp(phone, otp).catch((err) => {
+      console.error('Failed to send WhatsApp OTP', err);
+    });
+
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, name: user.name },
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        hotelId: user.hotel_id || null
+      },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -52,15 +85,17 @@ async function register(req, res) {
 
 async function login(req, res) {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+    const { phone, password } = req.body;
+    if (!phone || !password) {
+      return res.status(400).json({ message: 'Phone and password are required' });
     }
 
     const db = getDb();
     const user = db
-      .prepare('SELECT id, name, email, phone, role, password_hash FROM users WHERE email = ?')
-      .get(email);
+      .prepare(
+        'SELECT id, name, email, phone, role, password_hash, hotel_id FROM users WHERE phone = ?'
+      )
+      .get(phone);
 
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -72,7 +107,13 @@ async function login(req, res) {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, name: user.name },
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        hotelId: user.hotel_id || null
+      },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -86,11 +127,65 @@ async function login(req, res) {
   }
 }
 
+async function verifyPhone(req, res) {
+  try {
+    const { phone, otp } = req.body;
+
+    if (!phone || !otp) {
+      return res.status(400).json({ message: 'Phone and OTP are required' });
+    }
+
+    const db = getDb();
+    const record = db
+      .prepare(
+        `
+        SELECT id, user_id, phone, otp, expires_at, verified
+        FROM phone_verifications
+        WHERE phone = ? AND otp = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `
+      )
+      .get(phone, otp);
+
+    if (!record) {
+      return res.status(400).json({ message: 'Invalid OTP' });
+    }
+
+    if (record.verified) {
+      return res.status(400).json({ message: 'OTP already used' });
+    }
+
+    const nowRow = db.prepare('SELECT datetime("now") as now').get();
+    if (nowRow.now > record.expires_at) {
+      return res.status(400).json({ message: 'OTP has expired' });
+    }
+
+    db.prepare('UPDATE phone_verifications SET verified = 1 WHERE id = ?').run(record.id);
+
+    return res.json({ message: 'Phone verified successfully' });
+  } catch (err) {
+    console.error('Verify phone error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 async function me(req, res) {
   try {
     const db = getDb();
     const user = db
-      .prepare('SELECT id, name, email, phone, role FROM users WHERE id = ?')
+      .prepare(
+        `SELECT u.id,
+                u.name,
+                u.email,
+                u.phone,
+                u.role,
+                u.hotel_id,
+                h.name as hotel_name
+         FROM users u
+         LEFT JOIN hotels h ON h.id = u.hotel_id
+         WHERE u.id = ?`
+      )
       .get(req.user.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -105,6 +200,7 @@ async function me(req, res) {
 module.exports = {
   register,
   login,
-  me
+  me,
+  verifyPhone
 };
 

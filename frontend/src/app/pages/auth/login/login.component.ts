@@ -9,14 +9,15 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
  
   selector: 'app-login',
     template: `
-    <section class="max-w-md mx-auto px-4 sm:px-6 py-10 sm:py-14">
+    <div class="auth-cover">
+    <section class="max-w-md w-full">
       <h1 class="font-heading text-2xl sm:text-3xl text-dark mb-6">Login</h1>
       <form [formGroup]="form" (ngSubmit)="login()" class="card p-5 sm:p-6 space-y-4">
         <div>
-          <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Email</label>
-          <input type="email" formControlName="email" class="w-full" />
-          <div class="text-xs text-red-600 mt-1" *ngIf="submitted && form.get('email')?.invalid">
-            Valid email is required.
+          <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Phone</label>
+          <input type="tel" formControlName="phone" class="w-full" />
+          <div class="text-xs text-red-600 mt-1" *ngIf="submitted && form.get('phone')?.invalid">
+            Phone is required.
           </div>
         </div>
         <div>
@@ -37,11 +38,13 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
       </form>
       <app-loading-spinner [show]="loading"></app-loading-spinner>
     </section>
+    </div>
   `
 })
 export class LoginComponent {
+  
   form = this.fb.group({
-    email: ['', [Validators.required, Validators.email]],
+    phone: ['', [Validators.required]],
     password: ['', Validators.required]
   });
   submitted = false;
@@ -60,9 +63,9 @@ export class LoginComponent {
     if (this.form.invalid) {
       return;
     }
-    const { email, password } = this.form.value;
+    const { phone, password } = this.form.value;
     this.loading = true;
-    this.auth.login(email!, password!).subscribe({
+    this.auth.login(phone!, password!).subscribe({
       next: () => {
         this.loading = false;
         this.router.navigate(['/']);

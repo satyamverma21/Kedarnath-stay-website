@@ -15,7 +15,8 @@ function verifyToken(req, res, next) {
       id: decoded.id,
       email: decoded.email,
       role: decoded.role,
-      name: decoded.name
+      name: decoded.name,
+      hotelId: decoded.hotelId || null
     };
     next();
   } catch (err) {
@@ -30,8 +31,16 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function requireAdminOrHotelAdmin(req, res, next) {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'hotel-admin')) {
+    return res.status(403).json({ message: 'Admin or hotel-admin access required' });
+  }
+  next();
+}
+
 module.exports = {
   verifyToken,
-  requireAdmin
+  requireAdmin,
+  requireAdminOrHotelAdmin
 };
 

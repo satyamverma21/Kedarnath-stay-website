@@ -193,7 +193,8 @@ export class HomeComponent {
     this.loadingRooms = true;
     this.roomService.listRooms().subscribe({
       next: (rooms) => {
-        this.featuredRooms = rooms.slice(0, 3);
+        debugger;
+        this.featuredRooms = rooms;
         this.loadingRooms = false;
       },
       error: () => {
@@ -204,7 +205,8 @@ export class HomeComponent {
     this.loadingTents = true;
     this.tentService.listTents().subscribe({
       next: (tents) => {
-        this.featuredTents = tents.slice(0, 3);
+        debugger;
+        this.featuredTents = tents;
         this.loadingTents = false;
       },
       error: () => {
