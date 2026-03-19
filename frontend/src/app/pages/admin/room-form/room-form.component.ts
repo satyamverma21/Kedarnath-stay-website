@@ -245,7 +245,7 @@ export class RoomFormComponent {
     this.uploadingImages = true;
     const formData = new FormData();
     this.selectedFiles.forEach((f) => formData.append('images', f));
-    debugger;
+    ;
     this.http.post<{ id: number; image_path: string; is_primary: number }[]>(`${environment.apiUrl}/admin/rooms/${this.id}/images`, formData).subscribe({
       next: () => {
         this.selectedFiles = [];

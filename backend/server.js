@@ -33,6 +33,7 @@ app.use('/api/payments', require('./routes/payments.routes'));
 app.use('/api/receipts', require('./routes/receipts.routes'));
 app.use('/api/enquiry', require('./routes/enquiry.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
+app.use('/api/promo-codes', require('./routes/promo-code.routes'));
 
 app.use((err, req, res, next) => {
   console.error('Unhandled error middleware:', err);

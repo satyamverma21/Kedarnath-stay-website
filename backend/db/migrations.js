@@ -124,6 +124,29 @@ function runMigrations() {
       verified INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS promo_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE NOT NULL,
+      agent_id INTEGER REFERENCES users(id),
+      discount_percent REAL NOT NULL,
+      max_uses INTEGER DEFAULT 0,
+      used_count INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'active',
+      valid_from DATETIME DEFAULT CURRENT_TIMESTAMP,
+      valid_until DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS agent_referrals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_id INTEGER REFERENCES users(id),
+      customer_id INTEGER REFERENCES users(id),
+      booking_id INTEGER REFERENCES bookings(id),
+      promo_code_id INTEGER REFERENCES promo_codes(id),
+      discount_amount REAL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Add hotel_id column to users table if it doesn't exist yet
@@ -145,6 +168,14 @@ function runMigrations() {
   const tentHasHotelId = tentColumns.some((col) => col.name === 'hotel_id');
   if (!tentHasHotelId) {
     db.exec('ALTER TABLE tents ADD COLUMN hotel_id INTEGER REFERENCES hotels(id);');
+  }
+
+  // Add promo_code_id column to bookings table if it doesn't exist yet
+  const bookingColumns = db.prepare('PRAGMA table_info(bookings)').all();
+  const bookingHasPromoCodeId = bookingColumns.some((col) => col.name === 'promo_code_id');
+  if (!bookingHasPromoCodeId) {
+    db.exec('ALTER TABLE bookings ADD COLUMN promo_code_id INTEGER REFERENCES promo_codes(id);');
+    db.exec('ALTER TABLE bookings ADD COLUMN discount_amount REAL DEFAULT 0;');
   }
 
   seedInitialData(db);

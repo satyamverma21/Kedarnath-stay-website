@@ -193,7 +193,7 @@ export class HomeComponent {
     this.loadingRooms = true;
     this.roomService.listRooms().subscribe({
       next: (rooms) => {
-        debugger;
+        ;
         this.featuredRooms = rooms;
         this.loadingRooms = false;
       },
@@ -205,7 +205,7 @@ export class HomeComponent {
     this.loadingTents = true;
     this.tentService.listTents().subscribe({
       next: (tents) => {
-        debugger;
+        ;
         this.featuredTents = tents;
         this.loadingTents = false;
       },

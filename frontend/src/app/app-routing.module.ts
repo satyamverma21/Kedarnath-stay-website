@@ -27,6 +27,7 @@ import { ManageHotelsComponent } from './pages/admin/manage-hotels/manage-hotels
 import { HotelFormComponent } from './pages/admin/hotel-form/hotel-form.component';
 import { ManageUsersComponent } from './pages/admin/manage-users/manage-users.component';
 import { UserFormComponent } from './pages/admin/user-form/user-form.component';
+import { PromoCodeMasterComponent } from './pages/admin/promo-code-master/promo-code-master.component';
 
 const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -74,6 +75,7 @@ const routes: Routes = [
       { path: 'tents', component: ManageTentsComponent },
       { path: 'tents/new', component: TentFormComponent },
       { path: 'tents/:id/edit', component: TentFormComponent },
+      { path: 'promo-codes', component: PromoCodeMasterComponent },
       { path: 'price-settings', component: PriceSettingsComponent },
       { path: 'bookings', component: BookingsListComponent },
       { path: 'enquiries', component: EnquiriesListComponent },

@@ -43,7 +43,7 @@ function generateBookingRef(db, id) {
 
 async function createBooking(req, res) {
   try {
-    const { propertyType, propertyId, checkIn, checkOut, guests, specialRequests } = req.body;
+    const { propertyType, propertyId, checkIn, checkOut, guests, specialRequests, promoCode } = req.body;
 
     if (!propertyType || !propertyId || !checkIn || !checkOut) {
       return res.status(400).json({ message: 'Missing required booking fields' });
@@ -72,20 +72,54 @@ async function createBooking(req, res) {
       return res.status(400).json({ message: 'Selected dates are not available' });
     }
 
-    const { baseAmount, taxAmount, totalAmount } = getPriceForProperty(
+    let { baseAmount, taxAmount, totalAmount } = getPriceForProperty(
       db,
       propertyType,
       propertyId,
       nights
     );
 
+    let promoCodeData = null;
+    let discountAmount = 0;
+
+    // Handle promo code if provided
+    if (promoCode) {
+      promoCodeData = db.prepare(`
+        SELECT pc.*, u.name as agent_name
+        FROM promo_codes pc
+        LEFT JOIN users u ON u.id = pc.agent_id
+        WHERE pc.code = ? AND pc.status = 'active'
+      `).get(promoCode);
+
+      if (!promoCodeData) {
+        return res.status(400).json({ message: 'Invalid promo code' });
+      }
+
+      // Check if promo code is still valid
+      if (promoCodeData.valid_until && new Date(promoCodeData.valid_until) < new Date()) {
+        return res.status(400).json({ message: 'Promo code has expired' });
+      }
+
+      // Check if max uses reached
+      if (promoCodeData.max_uses > 0 && promoCodeData.used_count >= promoCodeData.max_uses) {
+        return res.status(400).json({ message: 'Promo code usage limit reached' });
+      }
+
+      // Calculate discount
+      discountAmount = (baseAmount * promoCodeData.discount_percent) / 100;
+      totalAmount = baseAmount + taxAmount - discountAmount;
+
+      // Ensure total amount doesn't go below 0
+      if (totalAmount < 0) totalAmount = 0;
+    }
+
     const insertStmt = db.prepare(
       `INSERT INTO bookings (
         booking_ref, user_id, property_type, property_id,
         check_in, check_out, guests, nights,
-        base_amount, tax_amount, total_amount,
-        special_requests, status, payment_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid')`
+        base_amount, tax_amount, total_amount, discount_amount,
+        special_requests, status, payment_status, promo_code_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?)`
     );
 
     const tempRef = `TEMP-${Date.now()}`;
@@ -101,12 +135,31 @@ async function createBooking(req, res) {
       baseAmount,
       taxAmount,
       totalAmount,
-      specialRequests || null
+      discountAmount,
+      specialRequests || null,
+      promoCodeData ? promoCodeData.id : null
     );
 
     const bookingId = info.lastInsertRowid;
     const bookingRef = generateBookingRef(db, bookingId);
     db.prepare('UPDATE bookings SET booking_ref = ? WHERE id = ?').run(bookingRef, bookingId);
+
+    // Update promo code usage count
+    if (promoCodeData) {
+      db.prepare('UPDATE promo_codes SET used_count = used_count + 1 WHERE id = ?').run(promoCodeData.id);
+
+      // Create agent referral record
+      db.prepare(`
+        INSERT INTO agent_referrals (agent_id, customer_id, booking_id, promo_code_id, discount_amount)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        promoCodeData.agent_id,
+        req.user.id,
+        bookingId,
+        promoCodeData.id,
+        discountAmount
+      );
+    }
 
     const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
 

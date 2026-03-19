@@ -52,6 +52,7 @@ interface AdminUser {
           <select formControlName="role">
             <option value="admin">Admin</option>
             <option value="hotel-admin">Hotel Admin</option>
+            <option value="agent">Agent</option>
             <option value="customer">Customer</option>
           </select>
         </div>

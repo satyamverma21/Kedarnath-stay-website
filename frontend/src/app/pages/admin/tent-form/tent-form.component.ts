@@ -240,7 +240,7 @@ export class TentFormComponent {
   }
 
   uploadImages(): void {
-    // debugger;
+    // ;
     if (!this.id || !this.selectedFiles.length) return;
     this.imageError = '';
     this.uploadingImages = true;
@@ -248,7 +248,7 @@ export class TentFormComponent {
     this.selectedFiles.forEach((f) => formData.append('images', f));
     console.log(formData);
     
-    debugger;
+    ;
     this.http.post<{ id: number; image_path: string; is_primary: number }[]>(`${environment.apiUrl}/admin/tents/${this.id}/images`, formData).subscribe({
      
       next: () => {

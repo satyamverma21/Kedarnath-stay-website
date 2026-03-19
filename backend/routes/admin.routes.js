@@ -68,5 +68,8 @@ router.get('/enquiries', requireAdmin, adminController.listEnquiries);
 router.put('/enquiries/:id/status', requireAdmin, adminController.updateEnquiryStatus);
 router.delete('/enquiries/:id', requireAdmin, adminController.deleteEnquiry);
 
+// Agent statistics
+router.get('/agent-stats', requireAdmin, adminController.getAgentStats);
+
 module.exports = router;
 

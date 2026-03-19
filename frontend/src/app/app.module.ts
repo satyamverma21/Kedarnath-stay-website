@@ -7,10 +7,10 @@ import { NavbarComponent } from './shared/components/navbar/navbar.component';
 import { FooterComponent } from './shared/components/footer/footer.component';
 import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { JwtInterceptor } from './core/interceptors/jwt.interceptor';
-import { LoadingSpinnerComponent } from './shared/components/loading-spinner/loading-spinner.component';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { CurrencyInrPipe } from './shared/pipes/currency-inr.pipe';
 import { PropertyCardComponent } from './shared/components/property-card/property-card.component';
+import { LoadingSpinnerComponent } from './shared/components/loading-spinner/loading-spinner.component';
 
 // Page components
 import { HomeComponent } from './pages/home/home.component';
@@ -37,14 +37,16 @@ import { UserFormComponent } from './pages/admin/user-form/user-form.component';
 import { ManageUsersComponent } from './pages/admin/manage-users/manage-users.component';
 import { HotelFormComponent } from './pages/admin/hotel-form/hotel-form.component';
 import { ManageHotelsComponent } from './pages/admin/manage-hotels/manage-hotels.component';
+import { PromoCodeMasterComponent } from './pages/admin/promo-code-master/promo-code-master.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     NavbarComponent,
     FooterComponent,
-    LoadingSpinnerComponent,
     PropertyCardComponent,
+        LoadingSpinnerComponent,
+
     CurrencyInrPipe,
     HomeComponent,
     RoomSearchComponent,
@@ -54,7 +56,7 @@ import { ManageHotelsComponent } from './pages/admin/manage-hotels/manage-hotels
     PaymentComponent,
     ReceiptComponent,
     MyBookingsComponent,
-    EnquiryComponent,
+    EnquiryComponent,PromoCodeMasterComponent,
     LoginComponent,
     RegisterComponent,
     AdminLayoutComponent,

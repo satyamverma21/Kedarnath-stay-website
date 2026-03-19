@@ -491,7 +491,7 @@ async function uploadRoomImages(req, res) {
         message: `Maximum ${MAX_IMAGES_PER_PROPERTY} images per room. Remove an image to add more.`
       });
     }
-    debugger
+    
     const filesToAdd = req.files.slice(0, slotsLeft);
     console.log(req.files)
     const insert = db.prepare(
@@ -1016,6 +1016,35 @@ async function deleteEnquiry(req, res) {
   }
 }
 
+async function getAgentStats(req, res) {
+  try {
+    const db = getDb();
+    const agentStats = db.prepare(`
+      SELECT 
+        u.id,
+        u.name,
+        u.email,
+        u.phone,
+        COUNT(DISTINCT ar.customer_id) as total_customers,
+        COUNT(ar.id) as total_referrals,
+        IFNULL(SUM(ar.discount_amount), 0) as total_discount_given,
+        IFNULL(SUM(b.total_amount), 0) as total_revenue_generated,
+        COUNT(DISTINCT b.id) as total_bookings
+      FROM users u
+      LEFT JOIN agent_referrals ar ON ar.agent_id = u.id
+      LEFT JOIN bookings b ON b.id = ar.booking_id
+      WHERE u.role = 'agent'
+      GROUP BY u.id, u.name, u.email, u.phone
+      ORDER BY total_revenue_generated DESC
+    `).all();
+
+    res.json(agentStats);
+  } catch (err) {
+    console.error('Admin get agent stats error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 module.exports = {
   getDashboard,
   listRooms,
@@ -1048,6 +1077,7 @@ module.exports = {
   deletePriceSetting,
   listEnquiries,
   updateEnquiryStatus,
-  deleteEnquiry
+  deleteEnquiry,
+  getAgentStats
 };
 

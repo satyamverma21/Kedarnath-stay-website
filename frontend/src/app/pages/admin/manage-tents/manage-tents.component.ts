@@ -27,52 +27,58 @@ interface AdminTent {
     </div>
     <app-loading-spinner [show]="loading"></app-loading-spinner>
     <div *ngIf="!loading">
-      <div *ngIf="tents.length === 0" class="text-sm text-muted">
+      <div *ngIf="groupedTents.length === 0" class="text-sm text-muted">
         No tents created yet.
       </div>
-      <div *ngIf="tents.length" class="overflow-x-auto">
-        <table class="min-w-full text-sm border border-sand">
-          <thead class="bg-sand text-xs uppercase tracking-widest">
-            <tr>
-              <th class="px-3 py-2 text-left">ID</th>
-              <th class="px-3 py-2 text-left">Name</th>
-              <th class="px-3 py-2 text-left">Type</th>
-              <th class="px-3 py-2 text-left">Capacity</th>
-              <th class="px-3 py-2 text-left">Price</th>
-              <th class="px-3 py-2 text-left">Status</th>
-              <th class="px-3 py-2 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let t of tents" class="border-t border-sand">
-              <td class="px-3 py-2">{{ t.id }}</td>
-              <td class="px-3 py-2">{{ t.name }}</td>
-              <td class="px-3 py-2">{{ t.type }}</td>
-              <td class="px-3 py-2">{{ t.capacity }}</td>
-              <td class="px-3 py-2">₹{{ t.basePrice }}</td>
-              <td class="px-3 py-2">{{ t.status }}</td>
-              <td class="px-3 py-2 space-x-2">
-                <a
-                  [routerLink]="['/admin/tents', t.id, 'edit']"
-                  class="btn-primary text-xs inline-block"
-                  >Edit</a
-                >
-                <button class="btn-gold text-xs" (click)="toggleStatus(t)">
-                  Toggle Status
-                </button>
-                <button class="btn-primary text-xs" (click)="delete(t)">
-                  Delete
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div *ngFor="let group of groupedTents" class="mb-6">
+        <h2 class="font-semibold mb-2 text-sm uppercase tracking-widest">
+          Hotel: {{ group.hotelName }}
+        </h2>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm border border-sand">
+            <thead class="bg-sand text-xs uppercase tracking-widest">
+              <tr>
+                <th class="px-3 py-2 text-left">ID</th>
+                <th class="px-3 py-2 text-left">Name</th>
+                <th class="px-3 py-2 text-left">Type</th>
+                <th class="px-3 py-2 text-left">Capacity</th>
+                <th class="px-3 py-2 text-left">Price</th>
+                <th class="px-3 py-2 text-left">Status</th>
+                <th class="px-3 py-2 text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let t of group.tents" class="border-t border-sand">
+                <td class="px-3 py-2">{{ t.id }}</td>
+                <td class="px-3 py-2">{{ t.name }}</td>
+                <td class="px-3 py-2">{{ t.type }}</td>
+                <td class="px-3 py-2">{{ t.capacity }}</td>
+                <td class="px-3 py-2">₹{{ t.basePrice }}</td>
+                <td class="px-3 py-2">{{ t.status }}</td>
+                <td class="px-3 py-2 space-x-2">
+                  <a
+                    [routerLink]="['/admin/tents', t.id, 'edit']"
+                    class="btn-primary text-xs inline-block"
+                    >Edit</a
+                  >
+                  <button class="btn-gold text-xs" (click)="toggleStatus(t)">
+                    Toggle Status
+                  </button>
+                  <button class="btn-primary text-xs" (click)="delete(t)">
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   `
 })
 export class ManageTentsComponent {
   tents: AdminTent[] = [];
+  groupedTents: { hotelName: string; tents: AdminTent[] }[] = [];
   loading = false;
 
   constructor(private http: HttpClient) {
@@ -84,6 +90,18 @@ export class ManageTentsComponent {
     this.http.get<AdminTent[]>(`${environment.apiUrl}/admin/tents`).subscribe({
       next: (tents) => {
         this.tents = tents;
+        const groups = new Map<string, AdminTent[]>();
+        tents.forEach((t: any) => {
+          const name = t.hotel_name || 'Unassigned';
+          if (!groups.has(name)) {
+            groups.set(name, []);
+          }
+          groups.get(name)!.push(t);
+        });
+        this.groupedTents = Array.from(groups.entries()).map(([hotelName, ts]) => ({
+          hotelName,
+          tents: ts
+        }));
         this.loading = false;
       },
       error: () => {

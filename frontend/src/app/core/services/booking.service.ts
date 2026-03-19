@@ -19,6 +19,9 @@ export interface Booking {
   special_requests?: string;
   status: string;
   payment_status: string;
+  promo_code?: string;
+  discount_percent?: number;
+  discount_amount?: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -32,6 +35,8 @@ export class BookingService {
     checkOut: string;
     guests: number;
     specialRequests?: string;
+    promoCode?: string;
+    discountPercent?: number;
   }): Observable<Booking> {
     return this.http.post<Booking>(`${environment.apiUrl}/bookings`, payload);
   }
