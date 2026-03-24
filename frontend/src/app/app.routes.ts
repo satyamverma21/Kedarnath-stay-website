@@ -27,7 +27,6 @@ export const appRoutes: Routes = [
   },
   {
     path: 'booking/:type/:id',
-    canActivate: [AuthGuard],
     loadComponent: () =>
       import('./pages/booking/booking.component').then((m) => m.BookingComponent)
   },
@@ -145,9 +144,10 @@ export const appRoutes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' }
     ]
   },
-  { path: '**', 
+  {
+    path: '**',
     loadComponent: () =>
       import('./pages/home/home.component').then((m) => m.HomeComponent)
-   }
+  }
 ];
 

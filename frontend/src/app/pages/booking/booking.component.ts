@@ -143,7 +143,7 @@ export class BookingComponent {
     phone: [''],
     specialRequests: ['']
   });
-  
+
   promoCode = '';
   discountAmount = 0;
   discountPercent = 0;
@@ -160,6 +160,7 @@ export class BookingComponent {
     private fb: FormBuilder,
     private router: Router
   ) {
+    debugger;
     this.route.paramMap.subscribe((params) => {
       const typeParam = params.get('type') as PropertyType | null;
       const idParam = params.get('id');
@@ -208,32 +209,32 @@ export class BookingComponent {
       }
     });
   }
-  
+
   private calculatePricing(): void {
     if (!this.property) return;
-    
+
     const baseAmount = this.property.basePrice * this.nights;
     const discountAmount = baseAmount * (this.discountPercent / 100);
     const afterDiscount = baseAmount - discountAmount;
-    
+
     this.baseAmount = baseAmount;
     this.discountAmount = discountAmount;
     this.taxAmount = afterDiscount * 0.18;
     this.totalAmount = afterDiscount + this.taxAmount;
   }
-  
+
   onPromoCodeChange(): void {
     this.promoError = '';
     this.promoSuccess = '';
   }
-  
+
   applyPromoCode(): void {
     if (!this.promoCode) return;
-    
+
     this.promoError = '';
     this.promoSuccess = '';
     this.loading = true;
-    
+
     // Call backend API to validate promo code
     this.promoCodeService.validatePromoCode(this.promoCode.toUpperCase()).subscribe({
       next: (response: PromoCodeValidationResponse) => {
@@ -256,7 +257,7 @@ export class BookingComponent {
       }
     });
   }
-  
+
   fetchUserDetails(): void {
     const user = this.authService.getCurrentUser();
     if (user) {

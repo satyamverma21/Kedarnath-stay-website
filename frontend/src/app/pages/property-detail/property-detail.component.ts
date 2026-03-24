@@ -112,12 +112,8 @@ type PropertyType = 'room' | 'tent';
                   Check-out is required.
                 </div>
               </div>
-              <div>
-                <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Guests</label>
-                <input type="number" min="1" formControlName="guests" class="w-full" />
-                <div class="text-xs text-red-600 mt-1" *ngIf="submitted && bookingForm.get('guests')?.invalid">
-                  Guests must be at least 1.
-                </div>
+              <div class="text-sm text-red-600 font-medium my-3">
+                Sleeps up to {{ property.capacity }} guests means max {{ property.capacity }} adults per {{ type === 'room' ? 'room' : 'tent' }}.
               </div>
               <button class="btn-primary w-full mt-2" type="submit">
                 Book Now
@@ -143,8 +139,7 @@ export class PropertyDetailComponent {
 
   bookingForm = this.fb.group({
     checkIn: ['', Validators.required],
-    checkOut: ['', Validators.required],
-    guests: [1, [Validators.required, Validators.min(1)]]
+    checkOut: ['', Validators.required]
   });
 
   constructor(
@@ -201,13 +196,15 @@ export class PropertyDetailComponent {
   }
 
   goToBooking(): void {
+    debugger;
     this.submitted = true;
     this.error = '';
     if (this.bookingForm.invalid) {
-      this.error = 'Please select valid dates and guests.';
+      this.error = 'Please select valid dates.';
       return;
     }
-    const { checkIn, checkOut, guests } = this.bookingForm.value;
+    const { checkIn, checkOut } = this.bookingForm.value;
+    const guests = this.property?.capacity || 1;
     this.router.navigate(['/booking', this.type, this.id], {
       queryParams: { checkIn, checkOut, guests }
     });
