@@ -1,10 +1,7 @@
 import { Component } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { NgIf } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
 import { BookingService, Booking } from '../../core/services/booking.service';
 import { PaymentService } from '../../core/services/payment.service';
-import { CurrencyInrPipe } from '../../shared/pipes/currency-inr.pipe';
-import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 
 @Component({
   selector: 'app-payment',
@@ -15,8 +12,8 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
         <div>
           <div class="font-semibold text-dark">Booking {{ booking.booking_ref }}</div>
           <div class="text-muted mt-1">
-            {{ booking.check_in }} → {{ booking.check_out }} ·
-            {{ booking.nights }} nights · {{ booking.guests }} guests
+            {{ booking.check_in }} to {{ booking.check_out }} |
+            {{ booking.nights }} nights | {{ booking.guests }} guests
           </div>
         </div>
         <div class="border-t border-sand pt-4 space-y-2">
@@ -49,6 +46,9 @@ export class PaymentComponent {
   booking: Booking | null = null;
   loading = false;
   error = '';
+  guestPhone = '';
+  private routeParamsReady = false;
+  private queryParamsReady = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -60,14 +60,31 @@ export class PaymentComponent {
       const idParam = params.get('bookingId');
       if (idParam) {
         this.bookingId = Number(idParam);
-        this.loadBooking();
       }
+      this.routeParamsReady = true;
+      this.tryLoadBooking();
     });
+    this.route.queryParamMap.subscribe((params) => {
+      this.guestPhone = (params.get('phone') || '').trim();
+      this.queryParamsReady = true;
+      this.tryLoadBooking();
+    });
+  }
+
+  private tryLoadBooking(): void {
+    if (!this.routeParamsReady || !this.queryParamsReady || !this.bookingId) {
+      return;
+    }
+    this.loadBooking();
   }
 
   private loadBooking(): void {
     this.loading = true;
-    this.bookingService.getBooking(this.bookingId).subscribe({
+    const request = this.guestPhone
+      ? this.bookingService.getGuestBooking(this.bookingId, this.guestPhone)
+      : this.bookingService.getBooking(this.bookingId);
+
+    request.subscribe({
       next: (booking) => {
         this.booking = booking;
         this.loading = false;
@@ -87,7 +104,7 @@ export class PaymentComponent {
     this.error = '';
     try {
       await this.paymentService.loadRazorpayScript();
-      this.paymentService.createOrder(this.bookingId).subscribe({
+      this.paymentService.createOrder(this.bookingId, this.guestPhone || undefined).subscribe({
         next: (order) => {
           const options = {
             key: order.razorpayKeyId,
@@ -97,9 +114,20 @@ export class PaymentComponent {
             description: `Booking ${this.booking?.booking_ref}`,
             order_id: order.orderId,
             handler: (response: any) => {
-              this.verifyPayment(order.orderId, response.razorpay_payment_id, response.razorpay_signature);
+              this.verifyPayment(
+                order.orderId,
+                response.razorpay_payment_id,
+                response.razorpay_signature
+              );
             },
-            prefill: {},
+            prefill: {
+              name: this.booking?.guest_name || '',
+              email:
+                this.booking?.guest_email && this.booking.guest_email.endsWith('@auto.local')
+                  ? ''
+                  : this.booking?.guest_email || '',
+              contact: this.booking?.guest_phone || this.guestPhone || ''
+            },
             theme: {
               color: '#2d4a2d'
             }
@@ -116,7 +144,7 @@ export class PaymentComponent {
           this.error = err?.error?.message || 'Unable to create payment order.';
         }
       });
-    } catch (e) {
+    } catch (_e) {
       this.loading = false;
       this.error = 'Unable to load payment gateway. Check your connection.';
     }
@@ -128,12 +156,15 @@ export class PaymentComponent {
         razorpayOrderId: orderId,
         razorpayPaymentId: paymentId,
         razorpaySignature: signature,
-        bookingId: this.bookingId
+        bookingId: this.bookingId,
+        phone: this.guestPhone || undefined
       })
       .subscribe({
         next: () => {
           this.loading = false;
-          this.router.navigate(['/receipt', this.bookingId]);
+          this.router.navigate(['/receipt', this.bookingId], {
+            queryParams: this.guestPhone ? { phone: this.guestPhone } : {}
+          });
         },
         error: () => {
           this.loading = false;
@@ -142,4 +173,3 @@ export class PaymentComponent {
       });
   }
 }
-

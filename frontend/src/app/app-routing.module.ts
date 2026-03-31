@@ -36,17 +36,14 @@ const routes: Routes = [
   { path: 'property/:type/:id', component: PropertyDetailComponent },
   {
     path: 'booking/:type/:id',
-    canActivate: [AuthGuard],
     component: BookingComponent
   },
   {
     path: 'payment/:bookingId',
-    canActivate: [AuthGuard],
     component: PaymentComponent
   },
   {
     path: 'receipt/:bookingId',
-    canActivate: [AuthGuard],
     component: ReceiptComponent
   },
   {

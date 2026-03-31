@@ -35,6 +35,9 @@ interface AdminUser {
       </div>
       <a routerLink="/admin/users/new" class="btn-primary text-xs">Add User</a>
     </div>
+    <div *ngIf="errorMessage" class="mb-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+      {{ errorMessage }}
+    </div>
     <app-loading-spinner [show]="loading"></app-loading-spinner>
     <div *ngIf="!loading">
       <div *ngIf="groupedUsers.length === 0" class="text-sm text-muted">
@@ -86,6 +89,7 @@ export class ManageUsersComponent {
   hotels: AdminHotelOption[] = [];
   selectedHotelId: number | null = null;
   loading = false;
+  errorMessage = '';
   groupedUsers: { role: string; users: AdminUser[] }[] = [];
 
   constructor(private http: HttpClient) {
@@ -104,6 +108,7 @@ export class ManageUsersComponent {
 
   load(): void {
     this.loading = true;
+    this.errorMessage = '';
     const params: any = {};
     if (this.selectedHotelId != null) {
       params.hotelId = this.selectedHotelId;
@@ -114,7 +119,8 @@ export class ManageUsersComponent {
         this.groupUsersByRole();
         this.loading = false;
       },
-      error: () => {
+      error: (err) => {
+        this.errorMessage = err?.error?.message || 'Failed to load users';
         this.loading = false;
       }
     });
@@ -143,7 +149,9 @@ export class ManageUsersComponent {
     }
     this.http.delete(`${environment.apiUrl}/admin/users/${user.id}`).subscribe({
       next: () => this.load(),
-      error: () => {}
+      error: (err) => {
+        this.errorMessage = err?.error?.message || 'Failed to delete user';
+      }
     });
   }
 }

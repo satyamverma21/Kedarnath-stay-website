@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { getDb } = require('../db/database');
 const { sendWhatsappOtp } = require('../utils/whatsapp');
+const { normalizePhone, isValidPhone } = require('./guest.controller');
 require('dotenv').config();
 
 function validateEmail(email) {
@@ -64,17 +65,7 @@ async function register(req, res) {
       console.error('Failed to send WhatsApp OTP', err);
     });
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        name: user.name,
-        hotelId: user.hotel_id || null
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
+    const token = signAuthToken(user, process.env.JWT_EXPIRES_IN || '7d');
 
     return res.status(201).json({ token, user });
   } catch (err) {
@@ -106,17 +97,7 @@ async function login(req, res) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        name: user.name,
-        hotelId: user.hotel_id || null
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
+    const token = signAuthToken(user, process.env.JWT_EXPIRES_IN || '7d');
 
     const { password_hash, ...publicUser } = user;
 
@@ -190,9 +171,107 @@ async function me(req, res) {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    return res.json(user);
+    return res.json({
+      guest_id: String(user.id),
+      id: user.id,
+      name: user.name,
+      phone: user.phone,
+      email: user.email && user.email.endsWith('@auto.local') ? null : user.email,
+      role: user.role
+    });
   } catch (err) {
     console.error('Me error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+function fallbackEmail(phone) {
+  const digits = String(phone).replace(/\D/g, '');
+  return `user_${digits}@auto.local`;
+}
+
+function signAuthToken(user, expiresIn) {
+  return jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+      hotelId: user.hotel_id || null
+    },
+    process.env.JWT_SECRET,
+    { expiresIn }
+  );
+}
+
+async function phoneLogin(req, res) {
+  try {
+    const phone = normalizePhone(req.body.phone);
+    const name = String(req.body.name || '').trim();
+    const email = req.body.email ? String(req.body.email).trim() : '';
+
+    if (!isValidPhone(phone)) {
+      return res.status(400).json({ message: 'Valid phone number is required' });
+    }
+    if (email && !validateEmail(email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    const db = getDb();
+    let user = db
+      .prepare('SELECT id, name, email, phone, role, password_hash, hotel_id FROM users WHERE phone = ?')
+      .get(phone);
+
+    let exists = !!user;
+
+    if (!user) {
+      const finalName = name || 'Guest User';
+      const storedEmail = email || fallbackEmail(phone);
+      const emailExists = db.prepare('SELECT id FROM users WHERE email = ?').get(storedEmail);
+      const finalEmail = emailExists ? fallbackEmail(`${phone}${Date.now()}`) : storedEmail;
+      const passwordHash = await bcrypt.hash(`${phone}@pass`, 10);
+
+      const info = db
+        .prepare(
+          'INSERT INTO users (name, email, password_hash, phone, role, hotel_id) VALUES (?, ?, ?, ?, ?, ?)'
+        )
+        .run(finalName, finalEmail, passwordHash, phone, 'customer', null);
+
+      user = db
+        .prepare('SELECT id, name, email, phone, role, password_hash, hotel_id FROM users WHERE id = ?')
+        .get(info.lastInsertRowid);
+      exists = false;
+    } else {
+      // Keep returning guest data current when caller provides newer values.
+      const nextName = name || user.name;
+      let nextEmail = user.email;
+      if (email && validateEmail(email)) {
+        const emailTaken = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email, user.id);
+        if (!emailTaken) {
+          nextEmail = email;
+        }
+      }
+
+      if (nextName !== user.name || nextEmail !== user.email) {
+        db.prepare('UPDATE users SET name = ?, email = ? WHERE id = ?').run(nextName, nextEmail, user.id);
+        user = db
+          .prepare('SELECT id, name, email, phone, role, password_hash, hotel_id FROM users WHERE id = ?')
+          .get(user.id);
+      }
+    }
+
+    const token = signAuthToken(user, process.env.PHONE_LOGIN_JWT_EXPIRES_IN || '30d');
+
+    return res.json({
+      guest_id: String(user.id),
+      token,
+      exists,
+      name: user.name,
+      phone: user.phone,
+      email: user.email && user.email.endsWith('@auto.local') ? null : user.email
+    });
+  } catch (err) {
+    console.error('Phone login error', err);
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -201,6 +280,7 @@ module.exports = {
   register,
   login,
   me,
-  verifyPhone
+  verifyPhone,
+  phoneLogin
 };
 

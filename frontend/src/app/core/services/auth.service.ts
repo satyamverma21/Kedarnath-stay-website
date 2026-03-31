@@ -5,8 +5,9 @@ import { environment } from '../../../environments/environment';
 
 export interface User {
   id: number;
+  guest_id?: string;
   name: string;
-  email: string;
+  email: string | null;
   phone?: string;
   role: 'customer' | 'admin' | 'hotel-admin';
   hotelId?: number | null;
@@ -15,6 +16,15 @@ export interface User {
 interface AuthResponse {
   token: string;
   user: User;
+}
+
+interface PhoneLoginResponse {
+  guest_id: string;
+  token: string;
+  exists: boolean;
+  name: string;
+  phone: string;
+  email: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -46,11 +56,42 @@ export class AuthService {
       );
   }
 
+  phoneLogin(payload: { phone: string; name: string; email?: string }): Observable<User> {
+    return this.http
+      .post<PhoneLoginResponse>(`${environment.apiUrl}/auth/phone-login`, payload)
+      .pipe(
+        tap((res) => this.setToken(res.token)),
+        map((res) => ({
+          id: Number(res.guest_id),
+          guest_id: res.guest_id,
+          name: res.name,
+          phone: res.phone,
+          email: res.email,
+          role: 'customer' as const,
+          hotelId: null
+        }))
+      );
+  }
+
+  me(): Observable<User> {
+    return this.http.get<any>(`${environment.apiUrl}/auth/me`).pipe(
+      map((res) => ({
+        id: Number(res.id || res.guest_id),
+        guest_id: String(res.guest_id || res.id),
+        name: res.name,
+        phone: res.phone,
+        email: res.email ?? null,
+        role: (res.role || 'customer') as User['role'],
+        hotelId: res.hotel_id ?? res.hotelId ?? null
+      }))
+    );
+  }
+
   logout(): void {
     localStorage.removeItem(this.tokenKey);
   }
 
-  private setToken(token: string): void {
+  public setToken(token: string): void {
     localStorage.setItem(this.tokenKey, token);
   }
 
@@ -75,8 +116,10 @@ export class AuthService {
       const payload = JSON.parse(atob(payloadBase64));
       return {
         id: payload.id,
+        guest_id: String(payload.id),
         name: payload.name,
         email: payload.email,
+        phone: payload.phone,
         role: payload.role,
         hotelId: payload.hotelId ?? null
       };

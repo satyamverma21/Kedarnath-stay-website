@@ -196,7 +196,6 @@ export class PropertyDetailComponent {
   }
 
   goToBooking(): void {
-    debugger;
     this.submitted = true;
     this.error = '';
     if (this.bookingForm.invalid) {

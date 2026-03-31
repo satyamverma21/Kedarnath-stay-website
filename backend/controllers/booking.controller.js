@@ -1,4 +1,6 @@
 const { getDb } = require('../db/database');
+const bcrypt = require('bcryptjs');
+const { normalizePhone, isValidPhone } = require('./guest.controller');
 require('dotenv').config();
 
 function calculateNights(checkIn, checkOut) {
@@ -39,6 +41,38 @@ function generateBookingRef(db, id) {
   const year = new Date().getFullYear();
   const padded = String(id).padStart(5, '0');
   return `BK-${year}-${padded}`;
+}
+
+function validateEmail(email) {
+  return typeof email === 'string' && /\S+@\S+\.\S+/.test(email);
+}
+
+function fallbackEmail(phone) {
+  const digits = phone.replace(/\D/g, '');
+  return `user_${digits}@auto.local`;
+}
+
+async function ensureGuestUser(db, { name, phone, email }) {
+  let user = db.prepare('SELECT id, name, email, phone, role, hotel_id FROM users WHERE phone = ?').get(phone);
+  if (user) {
+    return user;
+  }
+
+  const autoPassword = `${phone}@pass`;
+  const passwordHash = await bcrypt.hash(autoPassword, 10);
+  const storedEmail = email || fallbackEmail(phone);
+  const emailExists = db.prepare('SELECT id FROM users WHERE email = ?').get(storedEmail);
+  const finalEmail = emailExists ? fallbackEmail(`${phone}${Date.now()}`) : storedEmail;
+
+  const insertUser = db.prepare(
+    'INSERT INTO users (name, email, password_hash, phone, role, hotel_id) VALUES (?, ?, ?, ?, ?, ?)'
+  );
+  const userInfo = insertUser.run(name, finalEmail, passwordHash, phone, 'customer', null);
+  user = db
+    .prepare('SELECT id, name, email, phone, role, hotel_id FROM users WHERE id = ?')
+    .get(userInfo.lastInsertRowid);
+
+  return user;
 }
 
 async function createBooking(req, res) {
@@ -227,8 +261,194 @@ async function cancelBooking(req, res) {
   }
 }
 
+async function createGuestBooking(req, res) {
+  try {
+    const {
+      name,
+      phone,
+      email,
+      propertyType,
+      propertyId,
+      checkIn,
+      checkOut,
+      guests,
+      specialRequests,
+      promoCode
+    } = req.body;
+
+    const normalizedPhone = normalizePhone(phone);
+    const trimmedName = String(name || '').trim();
+    const trimmedEmail = email ? String(email).trim() : '';
+
+    if (!normalizedPhone || !trimmedName) {
+      return res.status(400).json({ message: 'Name and phone number are required' });
+    }
+    if (!isValidPhone(normalizedPhone)) {
+      return res.status(400).json({ message: 'Valid phone number is required' });
+    }
+    if (trimmedEmail && !validateEmail(trimmedEmail)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+    if (!propertyType || !propertyId || !checkIn || !checkOut) {
+      return res.status(400).json({ message: 'Missing required booking fields' });
+    }
+    if (!['room', 'tent'].includes(propertyType)) {
+      return res.status(400).json({ message: 'Invalid property type' });
+    }
+
+    const db = getDb();
+
+    const user = await ensureGuestUser(db, {
+      name: trimmedName,
+      phone: normalizedPhone,
+      email: trimmedEmail
+    });
+
+    const nights = calculateNights(checkIn, checkOut);
+    if (nights <= 0) {
+      return res.status(400).json({ message: 'Checkout must be after checkin' });
+    }
+
+    const overlapping = db
+      .prepare(
+        `SELECT 1 FROM bookings
+         WHERE property_type = ?
+           AND property_id = ?
+           AND status != 'cancelled'
+           AND NOT (date(check_out) <= date(?) OR date(check_in) >= date(?))`
+      )
+      .get(propertyType, propertyId, checkIn, checkOut);
+
+    if (overlapping) {
+      return res.status(400).json({ message: 'Selected dates are not available' });
+    }
+
+    let { baseAmount, taxAmount, totalAmount } = getPriceForProperty(db, propertyType, propertyId, nights);
+
+    let promoCodeData = null;
+    let discountAmount = 0;
+
+    if (promoCode) {
+      promoCodeData = db.prepare(`
+        SELECT pc.*, u.name as agent_name
+        FROM promo_codes pc
+        LEFT JOIN users u ON u.id = pc.agent_id
+        WHERE pc.code = ? AND pc.status = 'active'
+      `).get(promoCode);
+
+      if (!promoCodeData) {
+        return res.status(400).json({ message: 'Invalid promo code' });
+      }
+      if (promoCodeData.valid_until && new Date(promoCodeData.valid_until) < new Date()) {
+        return res.status(400).json({ message: 'Promo code has expired' });
+      }
+      if (promoCodeData.max_uses > 0 && promoCodeData.used_count >= promoCodeData.max_uses) {
+        return res.status(400).json({ message: 'Promo code usage limit reached' });
+      }
+
+      discountAmount = (baseAmount * promoCodeData.discount_percent) / 100;
+      totalAmount = baseAmount + taxAmount - discountAmount;
+      if (totalAmount < 0) totalAmount = 0;
+    }
+
+    const insertStmt = db.prepare(
+      `INSERT INTO bookings (
+        booking_ref, user_id, property_type, property_id,
+        check_in, check_out, guests, nights,
+        base_amount, tax_amount, total_amount, discount_amount,
+        special_requests, status, payment_status, promo_code_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?)`
+    );
+
+    const tempRef = `TEMP-${Date.now()}`;
+    const info = insertStmt.run(
+      tempRef,
+      user.id,
+      propertyType,
+      propertyId,
+      checkIn,
+      checkOut,
+      guests || 1,
+      nights,
+      baseAmount,
+      taxAmount,
+      totalAmount,
+      discountAmount,
+      specialRequests || null,
+      promoCodeData ? promoCodeData.id : null
+    );
+
+    const bookingId = info.lastInsertRowid;
+    const bookingRef = generateBookingRef(db, bookingId);
+    db.prepare('UPDATE bookings SET booking_ref = ? WHERE id = ?').run(bookingRef, bookingId);
+
+    if (promoCodeData) {
+      db.prepare('UPDATE promo_codes SET used_count = used_count + 1 WHERE id = ?').run(promoCodeData.id);
+      db.prepare(`
+        INSERT INTO agent_referrals (agent_id, customer_id, booking_id, promo_code_id, discount_amount)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(promoCodeData.agent_id, user.id, bookingId, promoCodeData.id, discountAmount);
+    }
+
+    const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
+
+    return res.status(201).json({
+      booking: {
+        ...booking,
+        guest_name: user.name,
+        guest_phone: user.phone,
+        guest_email: trimmedEmail || user.email || null
+      },
+      guest_id: String(user.id)
+    });
+  } catch (err) {
+    console.error('Create guest booking error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+async function getGuestBookingById(req, res) {
+  try {
+    const bookingId = Number(req.params.id);
+    const phone = normalizePhone(req.query.phone);
+    if (!bookingId) {
+      return res.status(400).json({ message: 'Invalid booking id' });
+    }
+    if (!isValidPhone(phone)) {
+      return res.status(400).json({ message: 'Valid phone number is required' });
+    }
+
+    const db = getDb();
+    const booking = db
+      .prepare(
+        `SELECT b.*,
+                u.name as guest_name,
+                u.phone as guest_phone,
+                u.email as guest_email
+         FROM bookings b
+         JOIN users u ON u.id = b.user_id
+         WHERE b.id = ?`
+      )
+      .get(bookingId);
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+    if (booking.guest_phone !== phone) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    return res.json(booking);
+  } catch (err) {
+    console.error('Get guest booking by id error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 module.exports = {
   createBooking,
+  createGuestBooking,
+  getGuestBookingById,
   getMyBookings,
   getBookingById,
   cancelBooking

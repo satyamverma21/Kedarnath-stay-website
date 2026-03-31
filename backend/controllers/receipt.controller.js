@@ -1,5 +1,6 @@
 const { getDb } = require('../db/database');
 const { generateReceiptPdf } = require('../utils/pdfGenerator');
+const { normalizePhone, isValidPhone } = require('./guest.controller');
 
 async function getReceipt(req, res) {
   try {
@@ -10,8 +11,20 @@ async function getReceipt(req, res) {
     if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
     }
-    if (booking.user_id !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Access denied' });
+
+    if (req.user) {
+      if (booking.user_id !== req.user.id && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    } else {
+      const phone = normalizePhone(req.query.phone);
+      if (!isValidPhone(phone)) {
+        return res.status(400).json({ message: 'Valid phone number is required' });
+      }
+      const owner = db.prepare('SELECT phone FROM users WHERE id = ?').get(booking.user_id);
+      if (!owner || owner.phone !== phone) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
     }
     if (booking.payment_status !== 'paid') {
       return res.status(400).json({ message: 'Receipt available only for paid bookings' });

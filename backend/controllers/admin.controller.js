@@ -322,10 +322,42 @@ async function deleteUser(req, res) {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    if (req.user && req.user.id === id) {
+      return res.status(400).json({ message: 'You cannot delete your own account' });
+    }
+
+    const bookingsCount = db.prepare('SELECT COUNT(*) as c FROM bookings WHERE user_id = ?').get(id).c;
+    if (bookingsCount > 0) {
+      return res.status(400).json({
+        message: 'Cannot delete user with bookings. Remove or reassign related bookings first.'
+      });
+    }
+
+    const promoCodesCount = db.prepare('SELECT COUNT(*) as c FROM promo_codes WHERE agent_id = ?').get(id).c;
+    if (promoCodesCount > 0) {
+      return res.status(400).json({
+        message: 'Cannot delete user with promo codes. Remove related promo codes first.'
+      });
+    }
+
+    const referralsCount = db
+      .prepare('SELECT COUNT(*) as c FROM agent_referrals WHERE agent_id = ? OR customer_id = ?')
+      .get(id, id).c;
+    if (referralsCount > 0) {
+      return res.status(400).json({
+        message: 'Cannot delete user with referral records. Remove related referrals first.'
+      });
+    }
+
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
     return res.json({ success: true });
   } catch (err) {
     console.error('Admin delete user error', err);
+    if (err && err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+      return res.status(400).json({
+        message: 'Cannot delete user due to linked records. Remove linked data first.'
+      });
+    }
     return res.status(500).json({ message: 'Internal server error' });
   }
 }

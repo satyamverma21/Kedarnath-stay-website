@@ -32,13 +32,11 @@ export const appRoutes: Routes = [
   },
   {
     path: 'payment/:bookingId',
-    canActivate: [AuthGuard],
     loadComponent: () =>
       import('./pages/payment/payment.component').then((m) => m.PaymentComponent)
   },
   {
     path: 'receipt/:bookingId',
-    canActivate: [AuthGuard],
     loadComponent: () =>
       import('./pages/receipt/receipt.component').then((m) => m.ReceiptComponent)
   },

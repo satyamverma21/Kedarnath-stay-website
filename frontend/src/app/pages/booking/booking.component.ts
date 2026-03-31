@@ -1,303 +1,230 @@
 import { Component } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { NgIf } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { BookingService, Booking } from '../../core/services/booking.service';
+import { ActivatedRoute, Router } from '@angular/router';
+import { FormBuilder, Validators } from '@angular/forms';
+import { switchMap } from 'rxjs';
 import { RoomService, Room } from '../../core/services/room.service';
 import { TentService, Tent } from '../../core/services/tent.service';
-import { AuthService, User } from '../../core/services/auth.service';
-import { PromoCodeService, PromoCodeValidationResponse } from '../../core/services/promo-code.service';
-import { CurrencyInrPipe } from '../../shared/pipes/currency-inr.pipe';
-import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
+import { GuestService } from '../../core/services/guest.service';
+import { BookingService } from '../../core/services/booking.service';
+import { AuthService } from '../../core/services/auth.service';
 
 type PropertyType = 'room' | 'tent';
 
 @Component({
   selector: 'app-booking',
   template: `
-    <section class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10" *ngIf="property">
-      <h1 class="font-heading text-2xl sm:text-3xl text-dark mb-6">Confirm your booking</h1>
+    <section class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+      <h1 class="font-heading text-2xl sm:text-3xl text-dark mb-2">Confirm Your Booking</h1>
+      <p class="text-muted text-sm sm:text-base mb-6">
+        Confirm your guest details and continue to payment.
+      </p>
 
-      <div class="grid md:grid-cols-[1.2fr,1fr] gap-6 lg:gap-8">
-        <div class="card p-5 sm:p-6 space-y-4">
-          <h2 class="font-semibold text-dark">Booking summary</h2>
-          <div class="text-sm text-muted space-y-1">
-            <div><strong class="text-dark">{{ property.name }}</strong> ({{ type }})</div>
-            <div>Check-in: {{ checkIn }}</div>
-            <div>Check-out: {{ checkOut }}</div>
-            <div>Guests: {{ guests }} · Nights: {{ nights }}</div>
-          </div>
-          <div class="border-t border-sand pt-4 mt-2 text-sm space-y-2">
-            <div class="flex justify-between">
-              <span class="text-muted">Base amount</span>
-              <span>{{ baseAmount | currencyInr }}</span>
-            </div>
-            <div class="flex justify-between" *ngIf="discountAmount > 0">
-              <span class="text-muted">Discount ({{ promoCode }})</span>
-              <span class="text-green-600">-{{ discountAmount | currencyInr }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-muted">Tax (18% GST)</span>
-              <span>{{ taxAmount | currencyInr }}</span>
-            </div>
-            <div class="flex justify-between font-semibold text-earth text-base pt-2">
-              <span>Total</span>
-              <span>{{ totalAmount | currencyInr }}</span>
+      <div class="grid lg:grid-cols-[1fr,360px] gap-6" *ngIf="property">
+        <form class="card p-5 sm:p-6 space-y-4" [formGroup]="form" (ngSubmit)="confirmAndPay()">
+          <div>
+            <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Guest Name</label>
+            <input type="text" formControlName="name" placeholder="Your full name" />
+            <div class="text-xs text-red-600 mt-1" *ngIf="submitted && form.controls.name.invalid">
+              Name is required.
             </div>
           </div>
-          
-          <!-- Promo Code Section -->
-          <div class="border-t border-sand pt-4 mt-4">
-            <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Promo Code</label>
-            <div class="flex gap-2">
-              <input 
-                type="text" 
-                [(ngModel)]="promoCode" 
-                (ngModelChange)="onPromoCodeChange()"
-                class="flex-1 px-3 py-2 border border-sand rounded-md text-sm" 
-                placeholder="Enter promo code"
-                [disabled]="loading"
-              />
-              <button 
-                type="button" 
-                (click)="applyPromoCode()" 
-                class="btn-secondary text-sm px-4 py-2"
-                [disabled]="!promoCode || loading"
-              >
-                Apply
-              </button>
-            </div>
-            <div class="text-xs mt-1" *ngIf="promoError">
-              <span class="text-red-600">{{ promoError }}</span>
-            </div>
-            <div class="text-xs mt-1" *ngIf="promoSuccess">
-              <span class="text-green-600">{{ promoSuccess }}</span>
-            </div>
-          </div>
-        </div>
 
-        <div class="card p-5 sm:p-6">
-          <h2 class="font-semibold text-dark mb-4">Guest details</h2>
-          <form [formGroup]="form" (ngSubmit)="confirmBooking()" class="space-y-4 text-sm">
-            <div class="flex justify-end mb-2" *ngIf="authService.isLoggedIn()">
-              <button 
-                type="button" 
-                (click)="fetchUserDetails()" 
-                class="btn-secondary text-xs"
-                [disabled]="loading"
-              >
-                Fetch from logged-in user
-              </button>
+          <div>
+            <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Phone Number</label>
+            <input type="tel" formControlName="phone" placeholder="+91XXXXXXXXXX" />
+            <div class="text-xs text-red-600 mt-1" *ngIf="submitted && form.controls.phone.invalid">
+              Valid phone number is required.
             </div>
-            <div>
-              <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Name</label>
-              <input type="text" formControlName="name" class="w-full" />
-              <div class="text-xs text-red-600 mt-1" *ngIf="submitted && form.get('name')?.invalid">
-                Name is required.
-              </div>
+          </div>
+
+          <div>
+            <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Email (Optional)</label>
+            <input type="email" formControlName="email" placeholder="you@example.com" />
+            <div class="text-xs text-red-600 mt-1" *ngIf="submitted && form.controls.email.invalid">
+              Enter a valid email.
             </div>
-            <div>
-              <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Email</label>
-              <input type="email" formControlName="email" class="w-full" />
-              <div class="text-xs text-red-600 mt-1" *ngIf="submitted && form.get('email')?.invalid">
-                Valid email is required.
-              </div>
+          </div>
+
+          <button class="btn-primary w-full mt-2" type="submit" [disabled]="loading">
+            {{ loading ? 'Processing...' : 'Confirm & Pay' }}
+          </button>
+          <div class="text-xs text-red-600" *ngIf="error">{{ error }}</div>
+        </form>
+
+        <aside class="card p-5 sm:p-6 h-fit">
+          <h2 class="font-semibold text-dark mb-4">Booking Details</h2>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between gap-4">
+              <span class="text-muted">Property</span>
+              <span class="text-dark font-medium text-right">{{ property.name }}</span>
             </div>
-            <div>
-              <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Phone</label>
-              <input type="tel" formControlName="phone" class="w-full" />
+            <div class="flex justify-between gap-4">
+              <span class="text-muted">Type</span>
+              <span class="text-dark text-right uppercase">{{ type }}</span>
             </div>
-            <div>
-              <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Special requests</label>
-              <textarea rows="3" formControlName="specialRequests" class="w-full"></textarea>
+            <div class="flex justify-between gap-4">
+              <span class="text-muted">Check-in</span>
+              <span class="text-dark text-right">{{ checkIn }}</span>
             </div>
-            <button class="btn-primary w-full mt-2" type="submit" [disabled]="loading">
-              Confirm Booking
-            </button>
-            <div class="text-xs text-red-600" *ngIf="error">{{ error }}</div>
-          </form>
-        </div>
+            <div class="flex justify-between gap-4">
+              <span class="text-muted">Check-out</span>
+              <span class="text-dark text-right">{{ checkOut }}</span>
+            </div>
+            <div class="flex justify-between gap-4">
+              <span class="text-muted">Guests</span>
+              <span class="text-dark text-right">{{ guests }}</span>
+            </div>
+            <div class="flex justify-between gap-4">
+              <span class="text-muted">Rate</span>
+              <span class="text-dark text-right">{{ property.basePrice | currencyInr }} / night</span>
+            </div>
+          </div>
+        </aside>
       </div>
     </section>
-    <app-loading-spinner [show]="loading || !property"></app-loading-spinner>
+    <app-loading-spinner [show]="loading && !property"></app-loading-spinner>
   `
 })
 export class BookingComponent {
   type!: PropertyType;
-  id!: number;
-  property!: Room | Tent;
+  propertyId!: number;
   checkIn = '';
   checkOut = '';
   guests = 1;
-  nights = 1;
-  baseAmount = 0;
-  taxAmount = 0;
-  totalAmount = 0;
+  property: Room | Tent | null = null;
   loading = false;
   submitted = false;
   error = '';
+  isLoggedIn = false;
 
   form = this.fb.group({
-    name: ['', Validators.required],
-    email: ['', [Validators.required, Validators.email]],
-    phone: [''],
-    specialRequests: ['']
+    name: ['', [Validators.required]],
+    phone: ['', [Validators.required, Validators.pattern(/^\+?\d{10,15}$/)]],
+    email: ['', [Validators.email]]
   });
-
-  promoCode = '';
-  discountAmount = 0;
-  discountPercent = 0;
-  promoError = '';
-  promoSuccess = '';
 
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
+    private fb: FormBuilder,
     private roomService: RoomService,
     private tentService: TentService,
-    private bookingService: BookingService,
-    public authService: AuthService,
-    private promoCodeService: PromoCodeService,
-    private fb: FormBuilder,
-    private router: Router
+    private authService: AuthService,
+    private guestService: GuestService,
+    private bookingService: BookingService
   ) {
-    debugger;
     this.route.paramMap.subscribe((params) => {
-      const typeParam = params.get('type') as PropertyType | null;
+      const typeParam = params.get('type');
       const idParam = params.get('id');
-      if (!typeParam || !idParam) {
+      if (!typeParam || !idParam || !['room', 'tent'].includes(typeParam)) {
+        this.router.navigate(['/']);
         return;
       }
-      this.type = typeParam;
-      this.id = Number(idParam);
+      this.type = typeParam as PropertyType;
+      this.propertyId = Number(idParam);
+      this.loadProperty();
     });
 
     this.route.queryParamMap.subscribe((params) => {
       this.checkIn = params.get('checkIn') || '';
       this.checkOut = params.get('checkOut') || '';
       this.guests = Number(params.get('guests') || 1);
-      this.calculateNights();
-      this.loadProperty();
     });
+
+    this.isLoggedIn = this.authService.isLoggedIn();
+    if (this.isLoggedIn) {
+      this.prefillFromProfile();
+    }
   }
 
-  private calculateNights(): void {
-    if (!this.checkIn || !this.checkOut) {
-      this.nights = 1;
-      return;
-    }
-    const inDate = new Date(this.checkIn);
-    const outDate = new Date(this.checkOut);
-    const diffMs = outDate.getTime() - inDate.getTime();
-    const nights = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    this.nights = nights > 0 ? nights : 1;
+  private prefillFromProfile(): void {
+    this.authService.me().subscribe({
+      next: (user) => {
+        this.form.patchValue({
+          name: user.name || '',
+          phone: user.phone || '',
+          email: user.email || ''
+        });
+      },
+      error: () => {
+        this.authService.logout();
+        this.isLoggedIn = false;
+      }
+    });
   }
 
   private loadProperty(): void {
     this.loading = true;
-    const obs =
+    const request =
       this.type === 'room'
-        ? this.roomService.getRoom(this.id)
-        : this.tentService.getTent(this.id);
-    obs.subscribe({
-      next: (prop) => {
-        this.property = prop;
-        this.calculatePricing();
+        ? this.roomService.getRoom(this.propertyId)
+        : this.tentService.getTent(this.propertyId);
+
+    request.subscribe({
+      next: (property) => {
+        this.property = property;
         this.loading = false;
       },
       error: () => {
         this.loading = false;
+        this.error = 'Unable to load property details.';
       }
     });
   }
 
-  private calculatePricing(): void {
-    if (!this.property) return;
-
-    const baseAmount = this.property.basePrice * this.nights;
-    const discountAmount = baseAmount * (this.discountPercent / 100);
-    const afterDiscount = baseAmount - discountAmount;
-
-    this.baseAmount = baseAmount;
-    this.discountAmount = discountAmount;
-    this.taxAmount = afterDiscount * 0.18;
-    this.totalAmount = afterDiscount + this.taxAmount;
-  }
-
-  onPromoCodeChange(): void {
-    this.promoError = '';
-    this.promoSuccess = '';
-  }
-
-  applyPromoCode(): void {
-    if (!this.promoCode) return;
-
-    this.promoError = '';
-    this.promoSuccess = '';
-    this.loading = true;
-
-    // Call backend API to validate promo code
-    this.promoCodeService.validatePromoCode(this.promoCode.toUpperCase()).subscribe({
-      next: (response: PromoCodeValidationResponse) => {
-        if (response.valid && response.discount_percent) {
-          this.discountPercent = response.discount_percent;
-          this.promoSuccess = `Promo code applied successfully! ${response.discount_percent}% discount`;
-          this.calculatePricing();
-        } else {
-          this.promoError = response.message || 'Invalid promo code';
-          this.discountPercent = 0;
-          this.calculatePricing();
-        }
-        this.loading = false;
-      },
-      error: (err) => {
-        this.promoError = err?.error?.message || 'Failed to validate promo code';
-        this.discountPercent = 0;
-        this.calculatePricing();
-        this.loading = false;
-      }
-    });
-  }
-
-  fetchUserDetails(): void {
-    const user = this.authService.getCurrentUser();
-    if (user) {
-      this.form.patchValue({
-        name: user.name,
-        email: user.email,
-        phone: user.phone || ''
-      });
-    }
-  }
-
-  confirmBooking(): void {
+  confirmAndPay(): void {
     this.submitted = true;
     this.error = '';
-    if (this.form.invalid || !this.property) {
-      this.error = 'Please fill in the required fields.';
+
+    if (!this.property || !this.checkIn || !this.checkOut) {
+      this.error = 'Booking details are incomplete.';
       return;
     }
+    if (this.form.invalid) {
+      this.error = 'Please enter valid guest details.';
+      return;
+    }
+
+    const name = (this.form.value.name || '').trim();
+    const phone = (this.form.value.phone || '').trim();
+    const email = (this.form.value.email || '').trim();
+
     this.loading = true;
-    this.bookingService
-      .createBooking({
-        propertyType: this.type,
-        propertyId: this.property.id,
-        checkIn: this.checkIn,
-        checkOut: this.checkOut,
-        guests: this.guests,
-        specialRequests: this.form.value.specialRequests || undefined,
-        promoCode: this.promoCode || undefined,
-        discountPercent: this.discountPercent || undefined
+    this.authService
+      .phoneLogin({
+        phone,
+        name,
+        email: email || undefined
       })
+      .pipe(
+        switchMap(() =>
+          this.guestService.updateGuest({
+            name,
+            email: email || undefined
+          })
+        ),
+        switchMap(() =>
+          this.bookingService.createBooking({
+            propertyType: this.type,
+            propertyId: this.propertyId,
+            checkIn: this.checkIn,
+            checkOut: this.checkOut,
+            guests: this.guests
+          })
+        )
+      )
       .subscribe({
-        next: (booking: Booking) => {
+        next: (booking) => {
           this.loading = false;
-          this.router.navigate(['/payment', booking.id]);
+          this.isLoggedIn = true;
+          this.router.navigate(['/payment', booking.id], {
+            queryParams: { phone }
+          });
         },
         error: (err) => {
           this.loading = false;
-          this.error = err?.error?.message || 'Failed to create booking. Please try again.';
+          this.error = err?.error?.message || 'Unable to continue to payment.';
         }
       });
   }
 }
-

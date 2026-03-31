@@ -22,6 +22,14 @@ export interface Booking {
   promo_code?: string;
   discount_percent?: number;
   discount_amount?: number;
+  guest_name?: string;
+  guest_phone?: string;
+  guest_email?: string | null;
+}
+
+export interface GuestBookingResponse {
+  booking: Booking;
+  guest_id: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -39,6 +47,27 @@ export class BookingService {
     discountPercent?: number;
   }): Observable<Booking> {
     return this.http.post<Booking>(`${environment.apiUrl}/bookings`, payload);
+  }
+
+  createGuestBooking(payload: {
+    name: string;
+    phone: string;
+    email?: string;
+    propertyType: 'room' | 'tent';
+    propertyId: number;
+    checkIn: string;
+    checkOut: string;
+    guests: number;
+    specialRequests?: string;
+    promoCode?: string;
+  }): Observable<GuestBookingResponse> {
+    return this.http.post<GuestBookingResponse>(`${environment.apiUrl}/bookings/guest`, payload);
+  }
+
+  getGuestBooking(id: number, phone: string): Observable<Booking> {
+    return this.http.get<Booking>(`${environment.apiUrl}/bookings/guest/${id}`, {
+      params: { phone }
+    });
   }
 
   getMyBookings(): Observable<Booking[]> {

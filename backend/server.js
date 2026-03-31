@@ -29,6 +29,7 @@ app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/rooms', require('./routes/rooms.routes'));
 app.use('/api/tents', require('./routes/tents.routes'));
 app.use('/api/bookings', require('./routes/bookings.routes'));
+app.use('/api/guests', require('./routes/guests.routes'));
 app.use('/api/payments', require('./routes/payments.routes'));
 app.use('/api/receipts', require('./routes/receipts.routes'));
 app.use('/api/enquiry', require('./routes/enquiry.routes'));

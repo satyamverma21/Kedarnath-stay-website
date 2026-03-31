@@ -20,9 +20,10 @@ export interface PaymentOrder {
 export class PaymentService {
   constructor(private http: HttpClient) {}
 
-  createOrder(bookingId: number): Observable<PaymentOrder> {
+  createOrder(bookingId: number, phone?: string): Observable<PaymentOrder> {
     return this.http.post<PaymentOrder>(`${environment.apiUrl}/payments/create-order`, {
-      bookingId
+      bookingId,
+      phone
     });
   }
 
@@ -31,6 +32,7 @@ export class PaymentService {
     razorpayPaymentId: string;
     razorpaySignature: string;
     bookingId: number;
+    phone?: string;
   }): Observable<any> {
     return this.http.post(`${environment.apiUrl}/payments/verify`, payload);
   }

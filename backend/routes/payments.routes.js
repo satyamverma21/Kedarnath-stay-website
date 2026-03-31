@@ -5,11 +5,11 @@ const {
   verifyPayment,
   getPaymentByBooking
 } = require('../controllers/payment.controller');
-const { verifyToken } = require('../middleware/auth.middleware');
+const { attachUserIfToken } = require('../middleware/auth.middleware');
 
-router.post('/create-order', verifyToken, createPaymentOrder);
-router.post('/verify', verifyToken, verifyPayment);
-router.get('/booking/:bookingId', verifyToken, getPaymentByBooking);
+router.post('/create-order', attachUserIfToken, createPaymentOrder);
+router.post('/verify', attachUserIfToken, verifyPayment);
+router.get('/booking/:bookingId', attachUserIfToken, getPaymentByBooking);
 
 module.exports = router;
 
