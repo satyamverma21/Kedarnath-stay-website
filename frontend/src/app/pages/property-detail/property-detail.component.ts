@@ -93,8 +93,11 @@ type PropertyType = 'room' | 'tent';
           <div class="card p-5 sm:p-6">
             <div class="mb-4">
               <div class="text-earth font-semibold text-xl">
-                <span>{{ property.basePrice | currencyInr }}</span>
-                <span class="text-sm text-muted font-normal ml-1">/ night</span>
+                <span>{{ property.totalPrice | currencyInr }}</span>
+                <span class="text-sm text-muted font-normal ml-1">total</span>
+              </div>
+              <div class="text-xs text-muted mt-1">
+                {{ property.registrationAmount | currencyInr }} now + {{ property.arrivalAmount | currencyInr }} on arrival
               </div>
             </div>
             <form [formGroup]="bookingForm" (ngSubmit)="goToBooking()" class="space-y-4">

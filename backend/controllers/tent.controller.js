@@ -25,11 +25,11 @@ async function listTents(req, res) {
       params.push(type);
     }
     if (minPrice) {
-      query += ' AND basePrice >= ?';
+      query += ' AND totalPrice >= ?';
       params.push(Number(minPrice));
     }
     if (maxPrice) {
-      query += ' AND basePrice <= ?';
+      query += ' AND totalPrice <= ?';
       params.push(Number(maxPrice));
     }
     if (capacity) {

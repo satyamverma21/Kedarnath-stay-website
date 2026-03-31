@@ -46,7 +46,7 @@ import { CurrencyInrPipe } from '../../pipes/currency-inr.pipe';
         <div class="mt-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-sand/60">
           <div class="text-earth font-semibold text-base">
             <span>{{ price | currencyInr }}</span>
-            <span class="text-xs text-muted font-normal ml-1">/ night</span>
+            <span class="text-xs text-muted font-normal ml-1">total</span>
           </div>
           <button class="btn-primary text-xs w-full sm:w-auto" (click)="book.emit()">
             Book Now

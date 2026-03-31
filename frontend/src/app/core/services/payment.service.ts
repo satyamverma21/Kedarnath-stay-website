@@ -14,6 +14,12 @@ export interface PaymentOrder {
   amount: number;
   currency: string;
   razorpayKeyId: string;
+  bookingRef?: string;
+  paymentBreakdown?: {
+    paidNow: number;
+    dueOnArrival: number;
+    total: number;
+  };
 }
 
 @Injectable({ providedIn: 'root' })

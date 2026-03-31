@@ -29,6 +29,9 @@ function runMigrations() {
       description TEXT,
       capacity INTEGER DEFAULT 2,
       basePrice REAL NOT NULL,
+      registrationAmount REAL NOT NULL DEFAULT 0,
+      arrivalAmount REAL NOT NULL DEFAULT 0,
+      totalPrice REAL NOT NULL DEFAULT 0,
       amenities TEXT,
       status TEXT DEFAULT 'active',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -48,6 +51,9 @@ function runMigrations() {
       description TEXT,
       capacity INTEGER DEFAULT 2,
       basePrice REAL NOT NULL,
+      registrationAmount REAL NOT NULL DEFAULT 0,
+      arrivalAmount REAL NOT NULL DEFAULT 0,
+      totalPrice REAL NOT NULL DEFAULT 0,
       amenities TEXT,
       status TEXT DEFAULT 'active',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -73,6 +79,8 @@ function runMigrations() {
       base_amount REAL NOT NULL,
       tax_amount REAL NOT NULL,
       total_amount REAL NOT NULL,
+      registration_amount REAL NOT NULL DEFAULT 0,
+      arrival_amount REAL NOT NULL DEFAULT 0,
       special_requests TEXT,
       status TEXT DEFAULT 'pending',
       payment_status TEXT DEFAULT 'unpaid',
@@ -162,6 +170,28 @@ function runMigrations() {
   if (!roomHasHotelId) {
     db.exec('ALTER TABLE rooms ADD COLUMN hotel_id INTEGER REFERENCES hotels(id);');
   }
+  const roomHasRegistrationAmount = roomColumns.some((col) => col.name === 'registrationAmount');
+  if (!roomHasRegistrationAmount) {
+    db.exec('ALTER TABLE rooms ADD COLUMN registrationAmount REAL NOT NULL DEFAULT 0;');
+  }
+  const roomHasArrivalAmount = roomColumns.some((col) => col.name === 'arrivalAmount');
+  if (!roomHasArrivalAmount) {
+    db.exec('ALTER TABLE rooms ADD COLUMN arrivalAmount REAL NOT NULL DEFAULT 0;');
+  }
+  const roomHasTotalPrice = roomColumns.some((col) => col.name === 'totalPrice');
+  if (!roomHasTotalPrice) {
+    db.exec('ALTER TABLE rooms ADD COLUMN totalPrice REAL NOT NULL DEFAULT 0;');
+  }
+  db.exec(
+    `UPDATE rooms
+     SET registrationAmount = CASE WHEN registrationAmount > 0 THEN registrationAmount ELSE basePrice END,
+         arrivalAmount = CASE WHEN arrivalAmount > 0 THEN arrivalAmount ELSE 0 END,
+         totalPrice = CASE
+           WHEN totalPrice > 0 THEN totalPrice
+           ELSE (CASE WHEN registrationAmount > 0 THEN registrationAmount ELSE basePrice END)
+              + (CASE WHEN arrivalAmount > 0 THEN arrivalAmount ELSE 0 END)
+         END`
+  );
 
   // Add hotel_id column to tents table if it doesn't exist yet
   const tentColumns = db.prepare('PRAGMA table_info(tents)').all();
@@ -169,6 +199,28 @@ function runMigrations() {
   if (!tentHasHotelId) {
     db.exec('ALTER TABLE tents ADD COLUMN hotel_id INTEGER REFERENCES hotels(id);');
   }
+  const tentHasRegistrationAmount = tentColumns.some((col) => col.name === 'registrationAmount');
+  if (!tentHasRegistrationAmount) {
+    db.exec('ALTER TABLE tents ADD COLUMN registrationAmount REAL NOT NULL DEFAULT 0;');
+  }
+  const tentHasArrivalAmount = tentColumns.some((col) => col.name === 'arrivalAmount');
+  if (!tentHasArrivalAmount) {
+    db.exec('ALTER TABLE tents ADD COLUMN arrivalAmount REAL NOT NULL DEFAULT 0;');
+  }
+  const tentHasTotalPrice = tentColumns.some((col) => col.name === 'totalPrice');
+  if (!tentHasTotalPrice) {
+    db.exec('ALTER TABLE tents ADD COLUMN totalPrice REAL NOT NULL DEFAULT 0;');
+  }
+  db.exec(
+    `UPDATE tents
+     SET registrationAmount = CASE WHEN registrationAmount > 0 THEN registrationAmount ELSE basePrice END,
+         arrivalAmount = CASE WHEN arrivalAmount > 0 THEN arrivalAmount ELSE 0 END,
+         totalPrice = CASE
+           WHEN totalPrice > 0 THEN totalPrice
+           ELSE (CASE WHEN registrationAmount > 0 THEN registrationAmount ELSE basePrice END)
+              + (CASE WHEN arrivalAmount > 0 THEN arrivalAmount ELSE 0 END)
+         END`
+  );
 
   // Add promo_code_id column to bookings table if it doesn't exist yet
   const bookingColumns = db.prepare('PRAGMA table_info(bookings)').all();
@@ -177,6 +229,27 @@ function runMigrations() {
     db.exec('ALTER TABLE bookings ADD COLUMN promo_code_id INTEGER REFERENCES promo_codes(id);');
     db.exec('ALTER TABLE bookings ADD COLUMN discount_amount REAL DEFAULT 0;');
   }
+  const bookingHasRegistrationAmount = bookingColumns.some(
+    (col) => col.name === 'registration_amount'
+  );
+  if (!bookingHasRegistrationAmount) {
+    db.exec('ALTER TABLE bookings ADD COLUMN registration_amount REAL NOT NULL DEFAULT 0;');
+  }
+  const bookingHasArrivalAmount = bookingColumns.some((col) => col.name === 'arrival_amount');
+  if (!bookingHasArrivalAmount) {
+    db.exec('ALTER TABLE bookings ADD COLUMN arrival_amount REAL NOT NULL DEFAULT 0;');
+  }
+  db.exec(
+    `UPDATE bookings
+     SET registration_amount = CASE
+           WHEN registration_amount > 0 THEN registration_amount
+           ELSE total_amount
+         END,
+         arrival_amount = CASE
+           WHEN arrival_amount >= 0 THEN arrival_amount
+           ELSE 0
+         END`
+  );
 
   seedInitialData(db);
 }
@@ -207,7 +280,10 @@ function seedInitialData(db) {
   const roomCount = db.prepare('SELECT COUNT(*) as count FROM rooms').get().count;
   if (roomCount === 0) {
     const insertRoom = db.prepare(
-      'INSERT INTO rooms (name, type, description, capacity, basePrice, amenities, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      `INSERT INTO rooms (
+        name, type, description, capacity, basePrice,
+        registrationAmount, arrivalAmount, totalPrice, amenities, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
 
     insertRoom.run(
@@ -215,6 +291,9 @@ function seedInitialData(db) {
       'standard',
       'Cozy room with forest view and all basic amenities.',
       2,
+      2500,
+      1500,
+      1000,
       2500,
       JSON.stringify(['Free WiFi', 'Breakfast Included', 'Air Conditioning']),
       'active'
@@ -225,6 +304,9 @@ function seedInitialData(db) {
       'Spacious room facing the lake with balcony.',
       3,
       4000,
+      2400,
+      1600,
+      4000,
       JSON.stringify(['Free WiFi', 'Lake View', 'Balcony', 'King Bed']),
       'active'
     );
@@ -234,6 +316,9 @@ function seedInitialData(db) {
       'Two-bedroom suite ideal for families.',
       5,
       6000,
+      3600,
+      2400,
+      6000,
       JSON.stringify(['Living Area', 'Two Bedrooms', 'Mini Fridge']),
       'active'
     );
@@ -242,7 +327,10 @@ function seedInitialData(db) {
   const tentCount = db.prepare('SELECT COUNT(*) as count FROM tents').get().count;
   if (tentCount === 0) {
     const insertTent = db.prepare(
-      'INSERT INTO tents (name, type, description, capacity, basePrice, amenities, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      `INSERT INTO tents (
+        name, type, description, capacity, basePrice,
+        registrationAmount, arrivalAmount, totalPrice, amenities, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
 
     insertTent.run(
@@ -250,6 +338,9 @@ function seedInitialData(db) {
       'standard',
       'Comfortable camping tent with basic facilities.',
       2,
+      1800,
+      1000,
+      800,
       1800,
       JSON.stringify(['Shared Bonfire', 'Sleeping Bags']),
       'active'
@@ -260,6 +351,9 @@ function seedInitialData(db) {
       'Luxury safari tent with attached washroom.',
       3,
       3500,
+      2000,
+      1500,
+      3500,
       JSON.stringify(['Attached Washroom', 'Private Bonfire', 'Breakfast']),
       'active'
     );
@@ -268,6 +362,9 @@ function seedInitialData(db) {
       'honeymoon',
       'Romantic glamping tent with decor and amenities.',
       2,
+      5000,
+      3000,
+      2000,
       5000,
       JSON.stringify(['Decor Lighting', 'Private Bonfire', 'Candle Light Dinner']),
       'active'

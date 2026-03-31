@@ -12,29 +12,47 @@ function calculateNights(checkIn, checkOut) {
 }
 
 function getPriceForProperty(db, propertyType, propertyId, nights) {
-  const setting = db
-    .prepare(
-      'SELECT price_per_night, weekend_surcharge, tax_percent FROM price_settings WHERE property_type = ? AND property_id = ? LIMIT 1'
-    )
-    .get(propertyType, propertyId);
-
-  let basePricePerNight = 0;
-  if (setting) {
-    basePricePerNight = setting.price_per_night;
-  } else if (propertyType === 'room') {
-    const room = db.prepare('SELECT basePrice FROM rooms WHERE id = ?').get(propertyId);
-    basePricePerNight = room ? room.basePrice : 0;
+  let property = null;
+  if (propertyType === 'room') {
+    property = db
+      .prepare('SELECT registrationAmount, arrivalAmount, totalPrice, basePrice FROM rooms WHERE id = ?')
+      .get(propertyId);
   } else if (propertyType === 'tent') {
-    const tent = db.prepare('SELECT basePrice FROM tents WHERE id = ?').get(propertyId);
-    basePricePerNight = tent ? tent.basePrice : 0;
+    property = db
+      .prepare('SELECT registrationAmount, arrivalAmount, totalPrice, basePrice FROM tents WHERE id = ?')
+      .get(propertyId);
   }
 
-  const baseAmount = basePricePerNight * nights;
-  const taxPercent = (setting && setting.tax_percent) || Number(process.env.TAX_PERCENT || 18);
-  const taxAmount = (baseAmount * taxPercent) / 100;
-  const totalAmount = baseAmount + taxAmount;
+  if (!property) {
+    return null;
+  }
 
-  return { baseAmount, taxAmount, totalAmount };
+  const registrationPerNight = Number(property.registrationAmount || 0);
+  const arrivalPerNight = Number(property.arrivalAmount || 0);
+  const totalPerNight = Number(property.totalPrice || 0);
+
+  if (registrationPerNight > 0 && arrivalPerNight > 0 && totalPerNight > 0) {
+    const registrationAmount = registrationPerNight * nights;
+    const arrivalAmount = arrivalPerNight * nights;
+    const totalAmount = totalPerNight * nights;
+    return {
+      baseAmount: totalAmount,
+      taxAmount: 0,
+      totalAmount,
+      registrationAmount,
+      arrivalAmount
+    };
+  }
+
+  // Backward compatibility for legacy records that still only have basePrice.
+  const fallbackTotal = Number(property.basePrice || 0) * nights;
+  return {
+    baseAmount: fallbackTotal,
+    taxAmount: 0,
+    totalAmount: fallbackTotal,
+    registrationAmount: fallbackTotal,
+    arrivalAmount: 0
+  };
 }
 
 function generateBookingRef(db, id) {
@@ -50,6 +68,60 @@ function validateEmail(email) {
 function fallbackEmail(phone) {
   const digits = phone.replace(/\D/g, '');
   return `user_${digits}@auto.local`;
+}
+
+function recalculateStoredBookingAmounts(db, booking) {
+  if (!booking || booking.payment_status === 'paid' || !['room', 'tent'].includes(booking.property_type)) {
+    return booking;
+  }
+
+  const table = booking.property_type === 'room' ? 'rooms' : 'tents';
+  const property = db
+    .prepare(`SELECT registrationAmount, arrivalAmount, totalPrice FROM ${table} WHERE id = ?`)
+    .get(booking.property_id);
+
+  if (!property) {
+    return booking;
+  }
+
+  const nights = Math.max(Number(booking.nights || 0), 1);
+  const registrationPerNight = Number(property.registrationAmount || 0);
+  const arrivalPerNight = Number(property.arrivalAmount || 0);
+  const totalPerNight = Number(property.totalPrice || 0);
+
+  if (registrationPerNight <= 0 || arrivalPerNight <= 0 || totalPerNight <= 0) {
+    return booking;
+  }
+
+  const baseAmount = totalPerNight * nights;
+  const arrivalAmount = arrivalPerNight * nights;
+  const discountAmount = Number(booking.discount_amount || 0);
+  const registrationAmount = Math.max(registrationPerNight * nights - discountAmount, 0);
+  const totalAmount = Math.max(baseAmount - discountAmount, 0);
+
+  const changed =
+    Number(booking.base_amount || 0) !== baseAmount ||
+    Number(booking.registration_amount || 0) !== registrationAmount ||
+    Number(booking.arrival_amount || 0) !== arrivalAmount ||
+    Number(booking.total_amount || 0) !== totalAmount;
+
+  if (!changed) {
+    return booking;
+  }
+
+  db.prepare(
+    `UPDATE bookings
+     SET base_amount = ?, registration_amount = ?, arrival_amount = ?, total_amount = ?
+     WHERE id = ?`
+  ).run(baseAmount, registrationAmount, arrivalAmount, totalAmount, booking.id);
+
+  return {
+    ...booking,
+    base_amount: baseAmount,
+    registration_amount: registrationAmount,
+    arrival_amount: arrivalAmount,
+    total_amount: totalAmount
+  };
 }
 
 async function ensureGuestUser(db, { name, phone, email }) {
@@ -106,12 +178,16 @@ async function createBooking(req, res) {
       return res.status(400).json({ message: 'Selected dates are not available' });
     }
 
-    let { baseAmount, taxAmount, totalAmount } = getPriceForProperty(
+    const pricing = getPriceForProperty(
       db,
       propertyType,
       propertyId,
       nights
     );
+    if (!pricing) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+    let { baseAmount, taxAmount, totalAmount, registrationAmount, arrivalAmount } = pricing;
 
     let promoCodeData = null;
     let discountAmount = 0;
@@ -142,6 +218,7 @@ async function createBooking(req, res) {
       // Calculate discount
       discountAmount = (baseAmount * promoCodeData.discount_percent) / 100;
       totalAmount = baseAmount + taxAmount - discountAmount;
+      registrationAmount = Math.max(registrationAmount - discountAmount, 0);
 
       // Ensure total amount doesn't go below 0
       if (totalAmount < 0) totalAmount = 0;
@@ -151,9 +228,9 @@ async function createBooking(req, res) {
       `INSERT INTO bookings (
         booking_ref, user_id, property_type, property_id,
         check_in, check_out, guests, nights,
-        base_amount, tax_amount, total_amount, discount_amount,
+        base_amount, tax_amount, total_amount, registration_amount, arrival_amount, discount_amount,
         special_requests, status, payment_status, promo_code_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?)`
     );
 
     const tempRef = `TEMP-${Date.now()}`;
@@ -169,6 +246,8 @@ async function createBooking(req, res) {
       baseAmount,
       taxAmount,
       totalAmount,
+      registrationAmount,
+      arrivalAmount,
       discountAmount,
       specialRequests || null,
       promoCodeData ? promoCodeData.id : null
@@ -223,13 +302,14 @@ async function getBookingById(req, res) {
   try {
     const id = Number(req.params.id);
     const db = getDb();
-    const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id);
+    let booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id);
     if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
     }
     if (booking.user_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied' });
     }
+    booking = recalculateStoredBookingAmounts(db, booking);
     return res.json(booking);
   } catch (err) {
     console.error('Get booking by id error', err);
@@ -323,7 +403,11 @@ async function createGuestBooking(req, res) {
       return res.status(400).json({ message: 'Selected dates are not available' });
     }
 
-    let { baseAmount, taxAmount, totalAmount } = getPriceForProperty(db, propertyType, propertyId, nights);
+    const pricing = getPriceForProperty(db, propertyType, propertyId, nights);
+    if (!pricing) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+    let { baseAmount, taxAmount, totalAmount, registrationAmount, arrivalAmount } = pricing;
 
     let promoCodeData = null;
     let discountAmount = 0;
@@ -349,15 +433,16 @@ async function createGuestBooking(req, res) {
       discountAmount = (baseAmount * promoCodeData.discount_percent) / 100;
       totalAmount = baseAmount + taxAmount - discountAmount;
       if (totalAmount < 0) totalAmount = 0;
+      registrationAmount = Math.max(registrationAmount - discountAmount, 0);
     }
 
     const insertStmt = db.prepare(
       `INSERT INTO bookings (
         booking_ref, user_id, property_type, property_id,
         check_in, check_out, guests, nights,
-        base_amount, tax_amount, total_amount, discount_amount,
+        base_amount, tax_amount, total_amount, registration_amount, arrival_amount, discount_amount,
         special_requests, status, payment_status, promo_code_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?)`
     );
 
     const tempRef = `TEMP-${Date.now()}`;
@@ -373,6 +458,8 @@ async function createGuestBooking(req, res) {
       baseAmount,
       taxAmount,
       totalAmount,
+      registrationAmount,
+      arrivalAmount,
       discountAmount,
       specialRequests || null,
       promoCodeData ? promoCodeData.id : null
@@ -419,7 +506,7 @@ async function getGuestBookingById(req, res) {
     }
 
     const db = getDb();
-    const booking = db
+    let booking = db
       .prepare(
         `SELECT b.*,
                 u.name as guest_name,
@@ -438,6 +525,7 @@ async function getGuestBookingById(req, res) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
+    booking = recalculateStoredBookingAmounts(db, booking);
     return res.json(booking);
   } catch (err) {
     console.error('Get guest booking by id error', err);

@@ -66,7 +66,7 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
             [name]="room.name"
             [type]="room.type"
             [capacity]="room.capacity"
-            [price]="room.basePrice"
+            [price]="room.totalPrice"
             [images]="room.images"
             (book)="goToRoom(room.id)"
           ></app-property-card>

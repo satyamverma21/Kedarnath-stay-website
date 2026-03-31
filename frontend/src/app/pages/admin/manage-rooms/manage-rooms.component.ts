@@ -10,12 +10,13 @@ interface AdminRoom {
   name: string;
   type: string;
   capacity: number;
-  basePrice: number;
+  registrationAmount: number;
+  arrivalAmount: number;
+  totalPrice: number;
   status: string;
 }
 
 @Component({
- 
   selector: 'app-manage-rooms',
   template: `
     <h1 class="font-heading text-2xl mb-4">Manage Rooms</h1>
@@ -42,7 +43,9 @@ interface AdminRoom {
                 <th class="px-3 py-2 text-left">Name</th>
                 <th class="px-3 py-2 text-left">Type</th>
                 <th class="px-3 py-2 text-left">Capacity</th>
-                <th class="px-3 py-2 text-left">Price</th>
+                <th class="px-3 py-2 text-left">Reg.</th>
+                <th class="px-3 py-2 text-left">Arrival</th>
+                <th class="px-3 py-2 text-left">Total</th>
                 <th class="px-3 py-2 text-left">Status</th>
                 <th class="px-3 py-2 text-left">Actions</th>
               </tr>
@@ -53,7 +56,9 @@ interface AdminRoom {
                 <td class="px-3 py-2">{{ r.name }}</td>
                 <td class="px-3 py-2">{{ r.type }}</td>
                 <td class="px-3 py-2">{{ r.capacity }}</td>
-                <td class="px-3 py-2">₹{{ r.basePrice }}</td>
+                <td class="px-3 py-2">{{ r.registrationAmount | currencyInr }}</td>
+                <td class="px-3 py-2">{{ r.arrivalAmount | currencyInr }}</td>
+                <td class="px-3 py-2">{{ r.totalPrice | currencyInr }}</td>
                 <td class="px-3 py-2">{{ r.status }}</td>
                 <td class="px-3 py-2 space-x-2">
                   <a
@@ -133,4 +138,3 @@ export class ManageRoomsComponent {
     });
   }
 }
-

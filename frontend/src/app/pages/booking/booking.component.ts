@@ -75,8 +75,20 @@ type PropertyType = 'room' | 'tent';
               <span class="text-dark text-right">{{ guests }}</span>
             </div>
             <div class="flex justify-between gap-4">
-              <span class="text-muted">Rate</span>
-              <span class="text-dark text-right">{{ property.basePrice | currencyInr }} / night</span>
+              <span class="text-muted">Nights</span>
+              <span class="text-dark text-right">{{ nights }}</span>
+            </div>
+            <div class="flex justify-between gap-4">
+              <span class="text-muted">Registration Fee (Pay Now)</span>
+              <span class="text-dark text-right">{{ registrationTotal | currencyInr }}</span>
+            </div>
+            <div class="flex justify-between gap-4">
+              <span class="text-muted">Balance Due on Arrival</span>
+              <span class="text-dark text-right">{{ arrivalTotal | currencyInr }} (Cash only)</span>
+            </div>
+            <div class="flex justify-between gap-4 font-semibold">
+              <span class="text-muted">Total</span>
+              <span class="text-dark text-right">{{ totalPrice | currencyInr }}</span>
             </div>
           </div>
         </aside>
@@ -137,6 +149,26 @@ export class BookingComponent {
     }
   }
 
+  get nights(): number {
+    const inDate = new Date(this.checkIn);
+    const outDate = new Date(this.checkOut);
+    const diffMs = outDate.getTime() - inDate.getTime();
+    const nights = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    return nights > 0 ? nights : 1;
+  }
+
+  get registrationTotal(): number {
+    return Number(this.property?.registrationAmount || 0) * this.nights;
+  }
+
+  get arrivalTotal(): number {
+    return Number(this.property?.arrivalAmount || 0) * this.nights;
+  }
+
+  get totalPrice(): number {
+    return Number(this.property?.totalPrice || 0) * this.nights;
+  }
+
   private prefillFromProfile(): void {
     this.authService.me().subscribe({
       next: (user) => {
@@ -190,6 +222,30 @@ export class BookingComponent {
     const email = (this.form.value.email || '').trim();
 
     this.loading = true;
+
+    const createBookingRequest = () =>
+      this.bookingService.createBooking({
+        propertyType: this.type,
+        propertyId: this.propertyId,
+        checkIn: this.checkIn,
+        checkOut: this.checkOut,
+        guests: this.guests
+      });
+
+    if (this.isLoggedIn) {
+      createBookingRequest().subscribe({
+        next: (booking) => {
+          this.loading = false;
+          this.router.navigate(['/payment', booking.id]);
+        },
+        error: (err) => {
+          this.loading = false;
+          this.error = err?.error?.message || 'Unable to continue to payment.';
+        }
+      });
+      return;
+    }
+
     this.authService
       .phoneLogin({
         phone,
@@ -203,15 +259,7 @@ export class BookingComponent {
             email: email || undefined
           })
         ),
-        switchMap(() =>
-          this.bookingService.createBooking({
-            propertyType: this.type,
-            propertyId: this.propertyId,
-            checkIn: this.checkIn,
-            checkOut: this.checkOut,
-            guests: this.guests
-          })
-        )
+        switchMap(() => createBookingRequest())
       )
       .subscribe({
         next: (booking) => {

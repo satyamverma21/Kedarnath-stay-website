@@ -15,6 +15,43 @@ function hasBookingAccess(db, booking, req, phone) {
   return !!user && user.phone === phone;
 }
 
+function recalculateBookingAmounts(db, booking) {
+  if (!['room', 'tent'].includes(booking.property_type)) {
+    return null;
+  }
+
+  const table = booking.property_type === 'room' ? 'rooms' : 'tents';
+  const property = db
+    .prepare(`SELECT registrationAmount, arrivalAmount, totalPrice FROM ${table} WHERE id = ?`)
+    .get(booking.property_id);
+
+  if (!property) {
+    return null;
+  }
+
+  const nights = Math.max(Number(booking.nights || 0), 1);
+  const registrationPerNight = Number(property.registrationAmount || 0);
+  const arrivalPerNight = Number(property.arrivalAmount || 0);
+  const totalPerNight = Number(property.totalPrice || 0);
+
+  if (registrationPerNight <= 0 || arrivalPerNight <= 0 || totalPerNight <= 0) {
+    return null;
+  }
+
+  const baseAmount = totalPerNight * nights;
+  const arrivalAmount = arrivalPerNight * nights;
+  const discountAmount = Number(booking.discount_amount || 0);
+  const registrationAmount = Math.max(registrationPerNight * nights - discountAmount, 0);
+  const totalAmount = Math.max(baseAmount - discountAmount, 0);
+
+  return {
+    baseAmount,
+    registrationAmount,
+    arrivalAmount,
+    totalAmount
+  };
+}
+
 async function createPaymentOrder(req, res) {
   try {
     const { bookingId, phone } = req.body;
@@ -35,7 +72,40 @@ async function createPaymentOrder(req, res) {
       return res.status(400).json({ message: 'Booking already paid' });
     }
 
-    const order = await createOrder(booking.total_amount, booking.booking_ref);
+    const recalculated = recalculateBookingAmounts(db, booking);
+    if (recalculated && booking.payment_status !== 'paid') {
+      const regChanged = Number(booking.registration_amount || 0) !== recalculated.registrationAmount;
+      const arrChanged = Number(booking.arrival_amount || 0) !== recalculated.arrivalAmount;
+      const totalChanged = Number(booking.total_amount || 0) !== recalculated.totalAmount;
+      const baseChanged = Number(booking.base_amount || 0) !== recalculated.baseAmount;
+
+      if (regChanged || arrChanged || totalChanged || baseChanged) {
+        db.prepare(
+          `UPDATE bookings
+           SET base_amount = ?, registration_amount = ?, arrival_amount = ?, total_amount = ?
+           WHERE id = ?`
+        ).run(
+          recalculated.baseAmount,
+          recalculated.registrationAmount,
+          recalculated.arrivalAmount,
+          recalculated.totalAmount,
+          booking.id
+        );
+        booking.base_amount = recalculated.baseAmount;
+        booking.registration_amount = recalculated.registrationAmount;
+        booking.arrival_amount = recalculated.arrivalAmount;
+        booking.total_amount = recalculated.totalAmount;
+      }
+    }
+
+    const registrationAmount = Number(booking.registration_amount || booking.total_amount || 0);
+    const arrivalAmount = Number(booking.arrival_amount || 0);
+    const totalAmount = Number(booking.total_amount || registrationAmount + arrivalAmount);
+    if (registrationAmount <= 0) {
+      return res.status(400).json({ message: 'Invalid registration amount for this booking' });
+    }
+
+    const order = await createOrder(registrationAmount, booking.booking_ref);
 
     const existingPayment = db
       .prepare('SELECT * FROM payments WHERE booking_id = ? AND razorpay_order_id = ?')
@@ -45,14 +115,20 @@ async function createPaymentOrder(req, res) {
       db.prepare(
         `INSERT INTO payments (booking_id, razorpay_order_id, amount, currency, status)
          VALUES (?, ?, ?, ?, 'pending')`
-      ).run(bookingId, order.id, booking.total_amount, order.currency);
+      ).run(bookingId, order.id, registrationAmount, order.currency);
     }
 
     return res.json({
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      razorpayKeyId: process.env.RAZORPAY_KEY_ID
+      razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+      bookingRef: booking.booking_ref,
+      paymentBreakdown: {
+        paidNow: registrationAmount,
+        dueOnArrival: arrivalAmount,
+        total: totalAmount
+      }
     });
   } catch (err) {
     console.error('Create payment order error', err);
@@ -120,7 +196,15 @@ async function verifyPayment(req, res) {
 
     const updatedBooking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(bookingId);
 
-    return res.json({ success: true, booking: updatedBooking });
+    return res.json({
+      success: true,
+      booking: updatedBooking,
+      paymentBreakdown: {
+        paidNow: Number(updatedBooking.registration_amount || updatedBooking.total_amount || 0),
+        dueOnArrival: Number(updatedBooking.arrival_amount || 0),
+        total: Number(updatedBooking.total_amount || 0)
+      }
+    });
   } catch (err) {
     console.error('Verify payment error', err);
     return res.status(500).json({ message: 'Internal server error' });

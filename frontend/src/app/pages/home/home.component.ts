@@ -102,7 +102,7 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
           [name]="room.name"
           [type]="room.type"
           [capacity]="room.capacity"
-          [price]="room.basePrice"
+          [price]="room.totalPrice"
           [images]="room.images"
           (book)="goToProperty('room', room.id)"
         ></app-property-card>
@@ -118,7 +118,7 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
           [name]="tent.name"
           [type]="tent.type"
           [capacity]="tent.capacity"
-          [price]="tent.basePrice"
+          [price]="tent.totalPrice"
           [images]="tent.images"
           (book)="goToProperty('tent', tent.id)"
         ></app-property-card>

@@ -17,17 +17,20 @@ import { environment } from '../../../environments/environment';
         </div>
         <div class="border-t border-sand pt-4 mb-6 text-sm space-y-2">
           <div class="flex justify-between">
-            <span class="text-muted">Base amount</span>
-            <span>{{ booking.base_amount | currencyInr }}</span>
+            <span class="text-muted">Amount Paid Now</span>
+            <span>{{ booking.registration_amount | currencyInr }}</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-muted">Tax</span>
-            <span>{{ booking.tax_amount | currencyInr }}</span>
+            <span class="text-muted">Amount Due at Arrival</span>
+            <span>{{ booking.arrival_amount | currencyInr }} (Cash only)</span>
           </div>
           <div class="flex justify-between font-semibold text-earth text-base pt-2">
-            <span>Total</span>
+            <span>Total Booking Amount</span>
             <span>{{ booking.total_amount | currencyInr }}</span>
           </div>
+        </div>
+        <div class="text-sm text-muted mb-6">
+          Bring your booking reference and valid ID at check-in. Arrival balance is collected at the property.
         </div>
         <div class="flex flex-wrap gap-3">
           <button class="btn-primary" (click)="downloadPdf()">Download PDF</button>

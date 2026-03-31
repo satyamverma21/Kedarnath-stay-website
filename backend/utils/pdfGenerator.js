@@ -34,11 +34,15 @@ function generateReceiptPdf(booking, payment, user, property) {
       .text(`Guests: ${booking.guests}`)
       .moveDown();
 
+    const paidNow = Number(booking.registration_amount || booking.total_amount || 0);
+    const dueOnArrival = Number(booking.arrival_amount || 0);
+    const total = Number(booking.total_amount || paidNow + dueOnArrival);
+
     doc.text('Amount Breakdown', { underline: true });
     doc
-      .text(`Base Amount: ₹${booking.base_amount.toFixed(2)}`)
-      .text(`Tax: ₹${booking.tax_amount.toFixed(2)}`)
-      .text(`Total: ₹${booking.total_amount.toFixed(2)}`)
+      .text(`Paid Now (Registration): INR ${paidNow.toFixed(2)}`)
+      .text(`Due on Arrival (Cash): INR ${dueOnArrival.toFixed(2)}`)
+      .text(`Total Booking Amount: INR ${total.toFixed(2)}`)
       .moveDown();
 
     if (payment) {
@@ -49,10 +53,11 @@ function generateReceiptPdf(booking, payment, user, property) {
         .text(`Status: ${payment.status}`)
         .text(`Paid At: ${payment.paid_at || '-'}`)
         .moveDown();
-    }
+    }x
 
     doc
       .text('Thank you for booking with us!', { align: 'center' })
+      .text('Please carry your booking reference at check-in.', { align: 'center' })
       .moveDown();
 
     doc
@@ -68,4 +73,3 @@ function generateReceiptPdf(booking, payment, user, property) {
 module.exports = {
   generateReceiptPdf
 };
-

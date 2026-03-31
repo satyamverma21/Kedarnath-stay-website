@@ -10,7 +10,10 @@ export interface Tent {
   type: string;
   description?: string;
   capacity: number;
-  basePrice: number;
+  registrationAmount: number;
+  arrivalAmount: number;
+  totalPrice: number;
+  basePrice?: number;
   amenities: string[];
   status: string;
   images: PropertyImage[];

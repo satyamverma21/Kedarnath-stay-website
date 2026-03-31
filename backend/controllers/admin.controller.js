@@ -394,13 +394,31 @@ async function listRooms(req, res) {
 
 async function createRoom(req, res) {
   try {
-    const { name, type, description, capacity, basePrice, amenities, status, hotelId } = req.body;
-    if (!name || !type || !basePrice) {
+    const {
+      name,
+      type,
+      description,
+      capacity,
+      registrationAmount,
+      arrivalAmount,
+      amenities,
+      status,
+      hotelId
+    } = req.body;
+    const registration = Number(registrationAmount);
+    const arrival = Number(arrivalAmount);
+    if (!name || !type || !Number.isFinite(registration) || !Number.isFinite(arrival)) {
       return res
         .status(400)
-        .json({ message: 'Name, type and basePrice are required for a room' });
+        .json({ message: 'Name, type, registrationAmount and arrivalAmount are required for a room' });
+    }
+    if (registration <= 0 || arrival <= 0) {
+      return res
+        .status(400)
+        .json({ message: 'registrationAmount and arrivalAmount must be greater than 0' });
     }
     const db = getDb();
+    const totalPrice = registration + arrival;
 
     let effectiveHotelId = null;
     if (req.user.role === 'hotel-admin') {
@@ -416,15 +434,22 @@ async function createRoom(req, res) {
     }
 
     const stmt = db.prepare(
-      `INSERT INTO rooms (name, type, description, capacity, basePrice, amenities, status, hotel_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO rooms (
+        name, type, description, capacity,
+        basePrice, registrationAmount, arrivalAmount, totalPrice,
+        amenities, status, hotel_id
+      )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     const info = stmt.run(
       name,
       type,
       description || null,
       capacity || 2,
-      basePrice,
+      totalPrice,
+      registration,
+      arrival,
+      totalPrice,
       amenities ? JSON.stringify(amenities) : null,
       status || 'active',
       effectiveHotelId
@@ -440,7 +465,7 @@ async function createRoom(req, res) {
 async function updateRoom(req, res) {
   try {
     const id = Number(req.params.id);
-    const { name, type, description, capacity, basePrice, amenities, status } = req.body;
+    const { name, type, description, capacity, registrationAmount, arrivalAmount, amenities, status } = req.body;
     const db = getDb();
     const existing = db.prepare('SELECT * FROM rooms WHERE id = ?').get(id);
     if (!existing) {
@@ -453,10 +478,26 @@ async function updateRoom(req, res) {
         return res.status(403).json({ message: 'Not allowed to modify rooms of another hotel' });
       }
     }
+    const nextRegistration =
+      registrationAmount != null ? Number(registrationAmount) : Number(existing.registrationAmount || 0);
+    const nextArrival =
+      arrivalAmount != null ? Number(arrivalAmount) : Number(existing.arrivalAmount || 0);
+    if (!Number.isFinite(nextRegistration) || !Number.isFinite(nextArrival)) {
+      return res
+        .status(400)
+        .json({ message: 'registrationAmount and arrivalAmount must be valid numbers' });
+    }
+    if (nextRegistration <= 0 || nextArrival <= 0) {
+      return res
+        .status(400)
+        .json({ message: 'registrationAmount and arrivalAmount must be greater than 0' });
+    }
+    const nextTotal = nextRegistration + nextArrival;
+
     const stmt = db.prepare(
       `UPDATE rooms SET 
         name = ?, type = ?, description = ?, capacity = ?, 
-        basePrice = ?, amenities = ?, status = ?
+        basePrice = ?, registrationAmount = ?, arrivalAmount = ?, totalPrice = ?, amenities = ?, status = ?
        WHERE id = ?`
     );
     stmt.run(
@@ -464,7 +505,10 @@ async function updateRoom(req, res) {
       type || existing.type,
       description || existing.description,
       capacity || existing.capacity,
-      basePrice != null ? basePrice : existing.basePrice,
+      nextTotal,
+      nextRegistration,
+      nextArrival,
+      nextTotal,
       amenities ? JSON.stringify(amenities) : existing.amenities,
       status || existing.status,
       id
@@ -636,14 +680,32 @@ async function listTents(req, res) {
 
 async function createTent(req, res) {
   try {
-    const { name, type, description, capacity, basePrice, amenities, status, hotelId } = req.body;
+    const {
+      name,
+      type,
+      description,
+      capacity,
+      registrationAmount,
+      arrivalAmount,
+      amenities,
+      status,
+      hotelId
+    } = req.body;
+    const registration = Number(registrationAmount);
+    const arrival = Number(arrivalAmount);
     
-    if (!name || !type || !basePrice) {
+    if (!name || !type || !Number.isFinite(registration) || !Number.isFinite(arrival)) {
       return res
         .status(400)
-        .json({ message: 'Name, type and basePrice are required for a tent' });
+        .json({ message: 'Name, type, registrationAmount and arrivalAmount are required for a tent' });
+    }
+    if (registration <= 0 || arrival <= 0) {
+      return res
+        .status(400)
+        .json({ message: 'registrationAmount and arrivalAmount must be greater than 0' });
     }
     const db = getDb();
+    const totalPrice = registration + arrival;
 
     let effectiveHotelId = null;
     if (req.user.role === 'hotel-admin') {
@@ -659,15 +721,22 @@ async function createTent(req, res) {
     }
 
     const stmt = db.prepare(
-      `INSERT INTO tents (name, type, description, capacity, basePrice, amenities, status, hotel_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO tents (
+        name, type, description, capacity,
+        basePrice, registrationAmount, arrivalAmount, totalPrice,
+        amenities, status, hotel_id
+      )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     const info = stmt.run(
       name,
       type,
       description || null,
       capacity || 2,
-      basePrice,
+      totalPrice,
+      registration,
+      arrival,
+      totalPrice,
       amenities ? JSON.stringify(amenities) : null,
       status || 'active',
       effectiveHotelId
@@ -683,7 +752,7 @@ async function createTent(req, res) {
 async function updateTent(req, res) {
   try {
     const id = Number(req.params.id);
-    const { name, type, description, capacity, basePrice, amenities, status } = req.body;
+    const { name, type, description, capacity, registrationAmount, arrivalAmount, amenities, status } = req.body;
     const db = getDb();
     const existing = db.prepare('SELECT * FROM tents WHERE id = ?').get(id);
     if (!existing) {
@@ -695,10 +764,26 @@ async function updateTent(req, res) {
         return res.status(403).json({ message: 'Not allowed to modify tents of another hotel' });
       }
     }
+    const nextRegistration =
+      registrationAmount != null ? Number(registrationAmount) : Number(existing.registrationAmount || 0);
+    const nextArrival =
+      arrivalAmount != null ? Number(arrivalAmount) : Number(existing.arrivalAmount || 0);
+    if (!Number.isFinite(nextRegistration) || !Number.isFinite(nextArrival)) {
+      return res
+        .status(400)
+        .json({ message: 'registrationAmount and arrivalAmount must be valid numbers' });
+    }
+    if (nextRegistration <= 0 || nextArrival <= 0) {
+      return res
+        .status(400)
+        .json({ message: 'registrationAmount and arrivalAmount must be greater than 0' });
+    }
+    const nextTotal = nextRegistration + nextArrival;
+
     const stmt = db.prepare(
       `UPDATE tents SET 
         name = ?, type = ?, description = ?, capacity = ?, 
-        basePrice = ?, amenities = ?, status = ?
+        basePrice = ?, registrationAmount = ?, arrivalAmount = ?, totalPrice = ?, amenities = ?, status = ?
        WHERE id = ?`
     );
     stmt.run(
@@ -706,7 +791,10 @@ async function updateTent(req, res) {
       type || existing.type,
       description || existing.description,
       capacity || existing.capacity,
-      basePrice != null ? basePrice : existing.basePrice,
+      nextTotal,
+      nextRegistration,
+      nextArrival,
+      nextTotal,
       amenities ? JSON.stringify(amenities) : existing.amenities,
       status || existing.status,
       id

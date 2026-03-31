@@ -10,12 +10,13 @@ interface AdminTent {
   name: string;
   type: string;
   capacity: number;
-  basePrice: number;
+  registrationAmount: number;
+  arrivalAmount: number;
+  totalPrice: number;
   status: string;
 }
 
 @Component({
- 
   selector: 'app-manage-tents',
   template: `
     <h1 class="font-heading text-2xl mb-4">Manage Tents</h1>
@@ -42,7 +43,9 @@ interface AdminTent {
                 <th class="px-3 py-2 text-left">Name</th>
                 <th class="px-3 py-2 text-left">Type</th>
                 <th class="px-3 py-2 text-left">Capacity</th>
-                <th class="px-3 py-2 text-left">Price</th>
+                <th class="px-3 py-2 text-left">Reg.</th>
+                <th class="px-3 py-2 text-left">Arrival</th>
+                <th class="px-3 py-2 text-left">Total</th>
                 <th class="px-3 py-2 text-left">Status</th>
                 <th class="px-3 py-2 text-left">Actions</th>
               </tr>
@@ -53,7 +56,9 @@ interface AdminTent {
                 <td class="px-3 py-2">{{ t.name }}</td>
                 <td class="px-3 py-2">{{ t.type }}</td>
                 <td class="px-3 py-2">{{ t.capacity }}</td>
-                <td class="px-3 py-2">₹{{ t.basePrice }}</td>
+                <td class="px-3 py-2">{{ t.registrationAmount | currencyInr }}</td>
+                <td class="px-3 py-2">{{ t.arrivalAmount | currencyInr }}</td>
+                <td class="px-3 py-2">{{ t.totalPrice | currencyInr }}</td>
                 <td class="px-3 py-2">{{ t.status }}</td>
                 <td class="px-3 py-2 space-x-2">
                   <a
@@ -133,4 +138,3 @@ export class ManageTentsComponent {
     });
   }
 }
-

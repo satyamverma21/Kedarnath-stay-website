@@ -68,7 +68,7 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
             [name]="tent.name"
             [type]="tent.type"
             [capacity]="tent.capacity"
-            [price]="tent.basePrice"
+            [price]="tent.totalPrice"
             [images]="tent.images"
             (book)="goToTent(tent.id)"
           ></app-property-card>

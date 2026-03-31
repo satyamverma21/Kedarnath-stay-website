@@ -18,21 +18,24 @@ import { PaymentService } from '../../core/services/payment.service';
         </div>
         <div class="border-t border-sand pt-4 space-y-2">
           <div class="flex justify-between">
-            <span class="text-muted">Base amount</span>
-            <span>{{ booking.base_amount | currencyInr }}</span>
+            <span class="text-muted">Registration Fee (Pay Now)</span>
+            <span>{{ booking.registration_amount | currencyInr }}</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-muted">Tax</span>
-            <span>{{ booking.tax_amount | currencyInr }}</span>
+            <span class="text-muted">Balance Due on Arrival</span>
+            <span>{{ booking.arrival_amount | currencyInr }} (Pay in cash at hotel check-in)</span>
+          </div>
+          <div class="text-xs text-muted">
+            Registration fee is non-refundable.
           </div>
           <div class="flex justify-between font-semibold text-earth text-base pt-2">
-            <span>Total payable</span>
+            <span>Total Booking Amount</span>
             <span>{{ booking.total_amount | currencyInr }}</span>
           </div>
         </div>
         <div class="pt-2">
           <button class="btn-primary w-full" (click)="payNow()" [disabled]="loading">
-            Pay Now
+            Pay Registration Fee ({{ booking.registration_amount | currencyInr }})
           </button>
           <div class="text-xs text-red-600 mt-2" *ngIf="error">{{ error }}</div>
         </div>

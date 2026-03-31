@@ -17,7 +17,9 @@ interface AdminRoom {
   type: string;
   description?: string;
   capacity: number;
-  basePrice: number;
+  registrationAmount: number;
+  arrivalAmount: number;
+  totalPrice: number;
   amenities: string[] | string | null;
   status: string;
 }
@@ -71,8 +73,22 @@ interface AdminHotelOption {
             <input type="number" min="1" formControlName="capacity" />
           </div>
           <div>
-            <label class="block text-xs uppercase mb-1 tracking-widest">Base Price / night</label>
-            <input type="number" min="0" formControlName="basePrice" />
+            <label class="block text-xs uppercase mb-1 tracking-widest">Registration Amount</label>
+            <input type="number" min="0" formControlName="registrationAmount" />
+            <div class="text-xs text-red-600" *ngIf="submitted && form.get('registrationAmount')?.invalid">
+              Registration amount must be greater than 0.
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs uppercase mb-1 tracking-widest">Arrival Amount</label>
+            <input type="number" min="0" formControlName="arrivalAmount" />
+            <div class="text-xs text-red-600" *ngIf="submitted && form.get('arrivalAmount')?.invalid">
+              Arrival amount must be greater than 0.
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs uppercase mb-1 tracking-widest">Total Price</label>
+            <input type="number" [value]="computedTotal" readonly />
           </div>
         </div>
         <div>
@@ -133,7 +149,8 @@ export class RoomFormComponent {
     type: ['standard', Validators.required],
     description: [''],
     capacity: [2, Validators.required],
-    basePrice: [0, Validators.required],
+    registrationAmount: [null as number | null, [Validators.required, Validators.min(0.01)]],
+    arrivalAmount: [null as number | null, [Validators.required, Validators.min(0.01)]],
     amenities: this.fb.array<string>([]),
     status: ['active', Validators.required],
     hotelId: ['']
@@ -189,6 +206,11 @@ export class RoomFormComponent {
   get amenities(): FormArray {
     return this.form.get('amenities') as FormArray;
   }
+  get computedTotal(): number {
+    const registrationAmount = Number(this.form.get('registrationAmount')?.value || 0);
+    const arrivalAmount = Number(this.form.get('arrivalAmount')?.value || 0);
+    return registrationAmount + arrivalAmount;
+  }
 
   addAmenity(): void {
     this.amenities.push(this.fb.control(''));
@@ -215,7 +237,8 @@ export class RoomFormComponent {
           type: room.type,
           description: room.description || '',
           capacity: room.capacity,
-          basePrice: room.basePrice,
+          registrationAmount: room.registrationAmount,
+          arrivalAmount: room.arrivalAmount,
           status: room.status
         });
         this.roomImages = room.images || [];

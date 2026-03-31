@@ -16,6 +16,8 @@ export interface Booking {
   base_amount: number;
   tax_amount: number;
   total_amount: number;
+  registration_amount: number;
+  arrival_amount: number;
   special_requests?: string;
   status: string;
   payment_status: string;
