@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { NgIf } from '@angular/common';
+import { NgForOf, NgIf } from '@angular/common';
 import { PropertyImage } from '../../../core/services/room.service';
 import { CurrencyInrPipe } from '../../pipes/currency-inr.pipe';
 
@@ -42,7 +42,16 @@ import { CurrencyInrPipe } from '../../pipes/currency-inr.pipe';
       </div>
       <div class="p-4 sm:p-5 flex-1 flex flex-col gap-2">
         <h3 class="font-heading text-lg sm:text-xl text-dark leading-tight">{{ name }}</h3>
+        <p class="text-sm text-muted leading-relaxed line-clamp-2" *ngIf="description">{{ description }}</p>
         <p class="text-sm text-muted">Sleeps up to {{ capacity }} guests</p>
+        <div class="flex flex-wrap gap-1.5 pt-1" *ngIf="amenities.length">
+          <span
+            *ngFor="let amenity of amenities"
+            class="inline-flex items-center rounded-full border border-sand/70 bg-sand/40 px-2 py-0.5 text-[11px] text-dark"
+          >
+            {{ amenity }}
+          </span>
+        </div>
         <div class="mt-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-sand/60">
           <div class="text-earth font-semibold text-base">
             <span>{{ price | currencyInr }}</span>
@@ -59,8 +68,11 @@ import { CurrencyInrPipe } from '../../pipes/currency-inr.pipe';
 export class PropertyCardComponent {
   @Input() name!: string;
   @Input() type!: string;
+  @Input() hotelName?: string | null;
+  @Input() description?: string | null;
   @Input() capacity!: number;
   @Input() price!: number;
+  @Input() amenities: string[] = [];
   @Input() set images(value: PropertyImage[]) {
     const hadImages = this._images.length > 0;
     this._images = value || [];

@@ -33,28 +33,68 @@ function parseAmenities(rawAmenities) {
   return [String(rawAmenities)];
 }
 
+function getFullyBookedRanges(bookings, quantity) {
+  const totalInventory = Math.max(Number(quantity || 1), 1);
+  if (!Array.isArray(bookings) || !bookings.length) {
+    return [];
+  }
+
+  const deltasByDate = new Map();
+  bookings.forEach((booking) => {
+    if (!booking?.check_in || !booking?.check_out || booking.check_out <= booking.check_in) {
+      return;
+    }
+    deltasByDate.set(booking.check_in, (deltasByDate.get(booking.check_in) || 0) + 1);
+    deltasByDate.set(booking.check_out, (deltasByDate.get(booking.check_out) || 0) - 1);
+  });
+
+  const dates = Array.from(deltasByDate.keys()).sort((a, b) => a.localeCompare(b));
+  const ranges = [];
+  let active = 0;
+
+  for (let i = 0; i < dates.length - 1; i += 1) {
+    const currentDate = dates[i];
+    const nextDate = dates[i + 1];
+    active += deltasByDate.get(currentDate) || 0;
+
+    if (currentDate >= nextDate || active < totalInventory) {
+      continue;
+    }
+
+    const lastRange = ranges.length ? ranges[ranges.length - 1] : null;
+    if (lastRange && lastRange.checkOut === currentDate) {
+      lastRange.checkOut = nextDate;
+    } else {
+      ranges.push({ checkIn: currentDate, checkOut: nextDate, status: 'full' });
+    }
+  }
+
+  return ranges;
+}
+
 async function listRooms(req, res) {
   try {
     const { type, minPrice, maxPrice, capacity } = req.query;
     const db = getDb();
 
-    let query = "SELECT * FROM rooms WHERE status = 'active'";
+    let query =
+      "SELECT r.*, h.name as hotel_name FROM rooms r LEFT JOIN hotels h ON h.id = r.hotel_id WHERE r.status = 'active'";
     const params = [];
 
     if (type) {
-      query += ' AND type = ?';
+      query += ' AND r.type = ?';
       params.push(type);
     }
     if (minPrice) {
-      query += ' AND totalPrice >= ?';
+      query += ' AND r.totalPrice >= ?';
       params.push(Number(minPrice));
     }
     if (maxPrice) {
-      query += ' AND totalPrice <= ?';
+      query += ' AND r.totalPrice <= ?';
       params.push(Number(maxPrice));
     }
     if (capacity) {
-      query += ' AND capacity >= ?';
+      query += ' AND r.capacity >= ?';
       params.push(Number(capacity));
     }
 
@@ -105,26 +145,28 @@ async function searchRooms(req, res) {
 
     const db = getDb();
     const params = [Number(guests)];
-    let query = "SELECT * FROM rooms WHERE status = 'active' AND capacity >= ?";
+    let query =
+      "SELECT r.*, h.name as hotel_name FROM rooms r LEFT JOIN hotels h ON h.id = r.hotel_id WHERE r.status = 'active' AND r.capacity >= ?";
 
     if (type) {
-      query += ' AND type = ?';
+      query += ' AND r.type = ?';
       params.push(type);
     }
 
     const rooms = db.prepare(query).all(...params);
 
     const availableRooms = rooms.filter((room) => {
-      const overlapping = db
+      const overlappingCount = db
         .prepare(
-          `SELECT 1 FROM bookings 
+          `SELECT COUNT(*) as c FROM bookings 
            WHERE property_type = 'room'
              AND property_id = ?
              AND status != 'cancelled'
              AND NOT (date(check_out) <= date(?) OR date(check_in) >= date(?))`
         )
-        .get(room.id, checkin, checkout);
-      return !overlapping;
+        .get(room.id, checkin, checkout).c;
+      const totalInventory = Math.max(Number(room.quantity || 1), 1);
+      return overlappingCount < totalInventory;
     });
 
     const roomIds = availableRooms.map((r) => r.id);
@@ -167,7 +209,14 @@ async function getRoomById(req, res) {
   try {
     const id = Number(req.params.id);
     const db = getDb();
-    const room = db.prepare('SELECT * FROM rooms WHERE id = ?').get(id);
+    const room = db
+      .prepare(
+        `SELECT r.*, h.name as hotel_name
+         FROM rooms r
+         LEFT JOIN hotels h ON h.id = r.hotel_id
+         WHERE r.id = ?`
+      )
+      .get(id);
     if (!room) {
       return res.status(404).json({ message: 'Room not found' });
     }
@@ -181,7 +230,7 @@ async function getRoomById(req, res) {
         url: buildImageUrl(req, path.join('uploads', 'rooms', path.basename(img.image_path)))
       }));
 
-    const bookedDateRanges = db
+    const activeBookings = db
       .prepare(
         `SELECT check_in, check_out, status
          FROM bookings
@@ -191,12 +240,8 @@ async function getRoomById(req, res) {
            AND date(check_out) >= date('now')
          ORDER BY date(check_in) ASC`
       )
-      .all(id)
-      .map((row) => ({
-        checkIn: row.check_in,
-        checkOut: row.check_out,
-        status: row.status
-      }));
+      .all(id);
+    const bookedDateRanges = getFullyBookedRanges(activeBookings, room.quantity);
 
     return res.json({
       ...room,

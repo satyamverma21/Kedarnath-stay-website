@@ -67,8 +67,11 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
             *ngFor="let tent of tents"
             [name]="tent.name"
             [type]="tent.type"
+            [hotelName]="tent.hotel_name || null"
+            [description]="tent.description || null"
             [capacity]="tent.capacity"
             [price]="tent.totalPrice"
+            [amenities]="tent.amenities"
             [images]="tent.images"
             (book)="goToTent(tent.id)"
           ></app-property-card>

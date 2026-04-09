@@ -39,6 +39,7 @@ router.delete('/users/:id', requireAdmin, adminController.deleteUser);
 
 // Rooms (admin + hotel-admin, hotel scoped in controller)
 router.get('/rooms', requireAdminOrHotelAdmin, adminController.listRooms);
+router.get('/inventory', requireAdminOrHotelAdmin, adminController.listInventory);
 router.post('/rooms', requireAdminOrHotelAdmin, adminController.createRoom);
 router.put('/rooms/:id', requireAdminOrHotelAdmin, adminController.updateRoom);
 router.delete('/rooms/:id', requireAdminOrHotelAdmin, adminController.deleteRoom);

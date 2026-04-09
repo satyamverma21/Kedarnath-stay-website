@@ -182,10 +182,15 @@ function runMigrations() {
   if (!roomHasTotalPrice) {
     db.exec('ALTER TABLE rooms ADD COLUMN totalPrice REAL NOT NULL DEFAULT 0;');
   }
+  const roomHasQuantity = roomColumns.some((col) => col.name === 'quantity');
+  if (!roomHasQuantity) {
+    db.exec('ALTER TABLE rooms ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1;');
+  }
   db.exec(
     `UPDATE rooms
      SET registrationAmount = CASE WHEN registrationAmount > 0 THEN registrationAmount ELSE basePrice END,
          arrivalAmount = CASE WHEN arrivalAmount > 0 THEN arrivalAmount ELSE 0 END,
+         quantity = CASE WHEN IFNULL(quantity, 0) > 0 THEN quantity ELSE 1 END,
          totalPrice = CASE
            WHEN totalPrice > 0 THEN totalPrice
            ELSE (CASE WHEN registrationAmount > 0 THEN registrationAmount ELSE basePrice END)

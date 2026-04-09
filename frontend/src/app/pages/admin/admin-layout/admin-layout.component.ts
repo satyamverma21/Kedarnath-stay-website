@@ -35,6 +35,7 @@ import { AuthService } from '../../../core/services/auth.service';
           <a *ngIf="isSuperAdmin" routerLink="/admin/hotels" routerLinkActive="active" (click)="closeMobileMenu()">Hotels</a>
           <a *ngIf="isSuperAdmin" routerLink="/admin/users" routerLinkActive="active" (click)="closeMobileMenu()">Users</a>
           <a routerLink="/admin/rooms" routerLinkActive="active" (click)="closeMobileMenu()">Rooms</a>
+          <a routerLink="/admin/inventory" routerLinkActive="active" (click)="closeMobileMenu()">Inventory</a>
           <a routerLink="/admin/tents" routerLinkActive="active" (click)="closeMobileMenu()">Tents</a>
           <a *ngIf="isSuperAdmin" routerLink="/admin/promo-codes" routerLinkActive="active" (click)="closeMobileMenu()">Promo Codes</a>
           <a *ngIf="isSuperAdmin" routerLink="/admin/price-settings" routerLinkActive="active" (click)="closeMobileMenu()">Price Settings</a>

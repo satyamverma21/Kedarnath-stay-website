@@ -171,7 +171,7 @@ interface Agent {
                   {{ promo.used_count }}{{ promo.max_uses > 0 ? '/' + promo.max_uses : '' }}
                 </td>
                 <td>
-                  {{ promo.valid_until ? (promo.valid_until | date:'mediumDate') : 'No expiry' }}
+                  {{ promo.valid_until ? formatDate(promo.valid_until) : 'No expiry' }}
                 </td>
                 <td>
                   <span class="status-pill" [ngClass]="promo.status === 'active' ? 'confirmed' : 'cancelled'">
@@ -329,5 +329,17 @@ export class PromoCodeMasterComponent implements OnInit {
     });
     this.editingPromoCode = null;
     this.showCreateForm = false;
+  }
+
+  formatDate(value: string): string {
+    if (!value) {
+      return '';
+    }
+    const datePart = value.includes('T') ? value.split('T')[0] : value;
+    const [year, month, day] = datePart.split('-');
+    if (!year || !month || !day) {
+      return value;
+    }
+    return `${day}/${month}/${year}`;
   }
 }

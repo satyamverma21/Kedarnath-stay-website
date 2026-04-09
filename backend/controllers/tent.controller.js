@@ -38,23 +38,24 @@ async function listTents(req, res) {
     const { type, minPrice, maxPrice, capacity } = req.query;
     const db = getDb();
 
-    let query = "SELECT * FROM tents WHERE status = 'active'";
+    let query =
+      "SELECT t.*, h.name as hotel_name FROM tents t LEFT JOIN hotels h ON h.id = t.hotel_id WHERE t.status = 'active'";
     const params = [];
 
     if (type) {
-      query += ' AND type = ?';
+      query += ' AND t.type = ?';
       params.push(type);
     }
     if (minPrice) {
-      query += ' AND totalPrice >= ?';
+      query += ' AND t.totalPrice >= ?';
       params.push(Number(minPrice));
     }
     if (maxPrice) {
-      query += ' AND totalPrice <= ?';
+      query += ' AND t.totalPrice <= ?';
       params.push(Number(maxPrice));
     }
     if (capacity) {
-      query += ' AND capacity >= ?';
+      query += ' AND t.capacity >= ?';
       params.push(Number(capacity));
     }
 
@@ -105,10 +106,11 @@ async function searchTents(req, res) {
 
     const db = getDb();
     const params = [Number(guests)];
-    let query = "SELECT * FROM tents WHERE status = 'active' AND capacity >= ?";
+    let query =
+      "SELECT t.*, h.name as hotel_name FROM tents t LEFT JOIN hotels h ON h.id = t.hotel_id WHERE t.status = 'active' AND t.capacity >= ?";
 
     if (type) {
-      query += ' AND type = ?';
+      query += ' AND t.type = ?';
       params.push(type);
     }
 
@@ -167,7 +169,14 @@ async function getTentById(req, res) {
   try {
     const id = Number(req.params.id);
     const db = getDb();
-    const tent = db.prepare('SELECT * FROM tents WHERE id = ?').get(id);
+    const tent = db
+      .prepare(
+        `SELECT t.*, h.name as hotel_name
+         FROM tents t
+         LEFT JOIN hotels h ON h.id = t.hotel_id
+         WHERE t.id = ?`
+      )
+      .get(id);
     if (!tent) {
       return res.status(404).json({ message: 'Tent not found' });
     }

@@ -176,20 +176,36 @@ export class UserFormComponent {
   save(): void {
     this.submitted = true;
     this.error = '';
-    if (this.form.invalid || (!this.isEdit && !this.form.value.password)) {
+
+    const name = (this.form.value.name || '').trim();
+    const phone = (this.form.value.phone || '').trim();
+    const password = (this.form.value.password || '').trim();
+
+    if (!this.isEdit) {
+      const missingFields: string[] = [];
+      if (!name) missingFields.push('name');
+      if (!phone) missingFields.push('phone');
+      if (!password) missingFields.push('password');
+
+      if (missingFields.length > 0) {
+        this.toast.error('Name, phone and password are mandatory for new users.');
+      }
+    }
+
+    if (this.form.invalid || (!this.isEdit && !password)) {
       return;
     }
     this.loading = true;
 
     const payload: any = {
-      name: this.form.value.name,
-      phone: this.form.value.phone,
+      name,
+      phone,
       email: this.form.value.email,
       role: this.form.value.role,
       hotelId: this.form.value.hotelId ? Number(this.form.value.hotelId) : null
     };
-    if (this.form.value.password) {
-      payload.password = this.form.value.password;
+    if (password) {
+      payload.password = password;
     }
 
     const req = this.isEdit && this.id

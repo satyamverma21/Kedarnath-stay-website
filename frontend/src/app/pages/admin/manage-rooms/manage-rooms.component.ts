@@ -11,6 +11,7 @@ interface AdminRoom {
   name: string;
   type: string;
   capacity: number;
+  quantity: number;
   registrationAmount: number;
   arrivalAmount: number;
   totalPrice: number;
@@ -45,6 +46,7 @@ interface AdminRoom {
                 <th>Name</th>
                 <th>Type</th>
                 <th>Capacity</th>
+                <th>Qty</th>
                 <th>Reg.</th>
                 <th>Arrival</th>
                 <th>Total</th>
@@ -58,6 +60,7 @@ interface AdminRoom {
                 <td class="font-medium">{{ r.name }}</td>
                 <td>{{ r.type }}</td>
                 <td>{{ r.capacity }}</td>
+                <td>{{ r.quantity || 1 }}</td>
                 <td>{{ r.registrationAmount | currencyInr }}</td>
                 <td>{{ r.arrivalAmount | currencyInr }}</td>
                 <td>{{ r.totalPrice | currencyInr }}</td>

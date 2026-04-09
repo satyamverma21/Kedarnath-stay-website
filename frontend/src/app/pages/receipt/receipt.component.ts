@@ -11,7 +11,7 @@ import { environment } from '../../../environments/environment';
         <h1 class="font-heading text-2xl sm:text-3xl text-dark mb-6">Booking Receipt</h1>
         <div class="text-sm text-muted space-y-1 mb-6">
           <div class="font-semibold text-dark">Booking {{ booking.booking_ref }}</div>
-          <div>Dates: {{ booking.check_in }} to {{ booking.check_out }} ({{ booking.nights }} nights)</div>
+          <div>Dates: {{ formatDate(booking.check_in) }} to {{ formatDate(booking.check_out) }} ({{ booking.nights }} nights)</div>
           <div>Guests: {{ booking.guests }}</div>
           <div>Status: {{ booking.status }} | Payment: {{ booking.payment_status }}</div>
         </div>
@@ -109,5 +109,16 @@ export class ReceiptComponent {
 
   goHome(): void {
     this.router.navigate(['/']);
+  }
+
+  formatDate(value: string): string {
+    if (!value) {
+      return '';
+    }
+    const [year, month, day] = value.split('-');
+    if (!year || !month || !day) {
+      return value;
+    }
+    return `${day}/${month}/${year}`;
   }
 }

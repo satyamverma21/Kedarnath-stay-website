@@ -26,6 +26,24 @@ export interface PaymentOrder {
   };
 }
 
+export interface SupportContacts {
+  hotelAdminPhone?: string;
+  mainAdminPhone?: string;
+}
+
+export interface VerifyPaymentResponse {
+  success: boolean;
+  verificationRequired?: boolean;
+  message?: string;
+  booking?: any;
+  supportContacts?: SupportContacts;
+}
+
+export interface PaymentByBookingResponse {
+  payment: any | null;
+  supportContacts?: SupportContacts;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PaymentService {
   constructor(private http: HttpClient) {}
@@ -42,8 +60,14 @@ export class PaymentService {
     method?: 'paytm' | 'phonepe' | 'upi';
     transactionId?: string;
     phone?: string;
-  }): Observable<any> {
-    return this.http.post(`${environment.apiUrl}/payments/verify`, payload);
+  }): Observable<VerifyPaymentResponse> {
+    return this.http.post<VerifyPaymentResponse>(`${environment.apiUrl}/payments/verify`, payload);
+  }
+
+  getPaymentByBooking(bookingId: number, phone?: string): Observable<PaymentByBookingResponse> {
+    return this.http.get<PaymentByBookingResponse>(`${environment.apiUrl}/payments/booking/${bookingId}`, {
+      params: phone ? { phone } : {}
+    });
   }
 }
 

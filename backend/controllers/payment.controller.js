@@ -68,6 +68,47 @@ function getHotelNameForBooking(db, booking) {
   return String(property.name || '').trim();
 }
 
+function getSupportContactsForBooking(db, booking) {
+  if (!booking || !['room', 'tent'].includes(booking.property_type)) {
+    return { hotelAdminPhone: '', mainAdminPhone: '' };
+  }
+
+  const table = booking.property_type === 'room' ? 'rooms' : 'tents';
+  const property = db.prepare(`SELECT hotel_id FROM ${table} WHERE id = ?`).get(booking.property_id);
+  const hotelId = property?.hotel_id ? Number(property.hotel_id) : null;
+
+  const mainAdmin = db
+    .prepare(
+      `SELECT phone
+       FROM users
+       WHERE role = 'admin' AND phone IS NOT NULL AND TRIM(phone) != ''
+       ORDER BY id ASC
+       LIMIT 1`
+    )
+    .get();
+
+  let hotelAdmin = null;
+  if (hotelId) {
+    hotelAdmin = db
+      .prepare(
+        `SELECT phone
+         FROM users
+         WHERE role = 'hotel-admin'
+           AND hotel_id = ?
+           AND phone IS NOT NULL
+           AND TRIM(phone) != ''
+         ORDER BY id ASC
+         LIMIT 1`
+      )
+      .get(hotelId);
+  }
+
+  return {
+    hotelAdminPhone: String(hotelAdmin?.phone || '').trim(),
+    mainAdminPhone: String(mainAdmin?.phone || '').trim()
+  };
+}
+
 async function createPaymentOrder(req, res) {
   try {
     const { bookingId, phone } = req.body;
@@ -260,6 +301,7 @@ async function verifyPayment(req, res) {
       verificationRequired: true,
       message: 'Payment submitted. Our team will verify and confirm shortly.',
       booking: updatedBooking,
+      supportContacts: getSupportContactsForBooking(db, updatedBooking),
       paymentBreakdown: {
         paidNow: Number(updatedBooking.registration_amount || updatedBooking.total_amount || 0),
         dueOnArrival: Number(updatedBooking.arrival_amount || 0),
@@ -286,7 +328,10 @@ async function getPaymentByBooking(req, res) {
     }
 
     const payment = db.prepare('SELECT * FROM payments WHERE booking_id = ?').get(bookingId);
-    return res.json(payment || null);
+    return res.json({
+      payment: payment || null,
+      supportContacts: getSupportContactsForBooking(db, booking)
+    });
   } catch (err) {
     console.error('Get payment by booking error', err);
     return res.status(500).json({ message: 'Internal server error' });

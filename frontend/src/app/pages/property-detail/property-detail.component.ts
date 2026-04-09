@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ElementRef, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgForOf, NgIf } from '@angular/common';
 import { RoomService, Room } from '../../core/services/room.service';
@@ -121,14 +121,66 @@ type BookedDateRange = {
             <form [formGroup]="bookingForm" (ngSubmit)="goToBooking()" class="space-y-4">
               <div>
                 <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Check-in</label>
-                <input type="date" formControlName="checkIn" class="w-full" [attr.min]="todayDate" />
+                <div class="relative">
+                  <input
+                    type="text"
+                    class="w-full pr-10 cursor-pointer"
+                    [value]="checkInDisplay"
+                    placeholder="DD/MM/YYYY"
+                    readonly
+                    (click)="openCheckInPicker()"
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-0 px-3 text-muted"
+                    (click)="openCheckInPicker()"
+                    aria-label="Select check-in date"
+                  >
+                    <span class="text-xs font-semibold">CAL</span>
+                  </button>
+                  <input
+                    #checkInPicker
+                    type="date"
+                    class="sr-only"
+                    [attr.min]="todayDate"
+                    [value]="bookingForm.value.checkIn || ''"
+                    (change)="onCheckInDatePicked($any($event.target).value)"
+                  />
+                </div>
+                <div class="text-xs text-muted mt-1">Format: DD/MM/YYYY</div>
                 <div class="text-xs text-red-600 mt-1" *ngIf="submitted && bookingForm.get('checkIn')?.invalid">
                   Check-in is required.
                 </div>
               </div>
               <div>
                 <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Check-out</label>
-                <input type="date" formControlName="checkOut" class="w-full" [attr.min]="minCheckoutDate" />
+                <div class="relative">
+                  <input
+                    type="text"
+                    class="w-full pr-10 cursor-pointer"
+                    [value]="checkOutDisplay"
+                    placeholder="DD/MM/YYYY"
+                    readonly
+                    (click)="openCheckOutPicker()"
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-0 px-3 text-muted"
+                    (click)="openCheckOutPicker()"
+                    aria-label="Select check-out date"
+                  >
+                    <span class="text-xs font-semibold">CAL</span>
+                  </button>
+                  <input
+                    #checkOutPicker
+                    type="date"
+                    class="sr-only"
+                    [attr.min]="minCheckoutDate"
+                    [value]="bookingForm.value.checkOut || ''"
+                    (change)="onCheckOutDatePicked($any($event.target).value)"
+                  />
+                </div>
+                <div class="text-xs text-muted mt-1">Format: DD/MM/YYYY</div>
                 <div class="text-xs text-red-600 mt-1" *ngIf="submitted && bookingForm.get('checkOut')?.invalid">
                   Check-out is required.
                 </div>
@@ -152,6 +204,9 @@ type BookedDateRange = {
   `
 })
 export class PropertyDetailComponent {
+  @ViewChild('checkInPicker') private checkInPicker?: ElementRef<HTMLInputElement>;
+  @ViewChild('checkOutPicker') private checkOutPicker?: ElementRef<HTMLInputElement>;
+
   type!: PropertyType;
   id!: number;
   property!: Room | Tent;
@@ -164,6 +219,8 @@ export class PropertyDetailComponent {
   todayDate = this.toYmd(new Date());
   minCheckoutDate = this.todayDate;
   dateOverlapError = '';
+  checkInDisplay = '';
+  checkOutDisplay = '';
 
   bookingForm = this.fb.group({
     checkIn: ['', Validators.required],
@@ -257,21 +314,41 @@ export class PropertyDetailComponent {
     });
   }
 
+  onCheckInDatePicked(isoDate: string): void {
+    this.bookingForm.patchValue({ checkIn: isoDate || '' }, { emitEvent: true });
+    this.checkInDisplay = this.formatDate(isoDate);
+  }
+
+  onCheckOutDatePicked(isoDate: string): void {
+    this.bookingForm.patchValue({ checkOut: isoDate || '' }, { emitEvent: true });
+    this.checkOutDisplay = this.formatDate(isoDate);
+  }
+
+  openCheckInPicker(): void {
+    this.openNativePicker(this.checkInPicker?.nativeElement);
+  }
+
+  openCheckOutPicker(): void {
+    this.openNativePicker(this.checkOutPicker?.nativeElement);
+  }
+
   formatDate(dateText: string): string {
     if (!dateText) {
       return '';
     }
-    const date = new Date(`${dateText}T00:00:00`);
-    return date.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
+    const [year, month, day] = dateText.split('-');
+    if (!year || !month || !day) {
+      return dateText;
+    }
+    return `${day}/${month}/${year}`;
   }
 
   private getDateOverlapError(checkIn: string, checkOut: string): string {
     if (!checkIn || !checkOut) {
       return '';
+    }
+    if (checkIn < this.todayDate) {
+      return 'Check-in cannot be in the past.';
     }
     if (checkOut <= checkIn) {
       return 'Check-out must be after check-in.';
@@ -289,5 +366,17 @@ export class PropertyDetailComponent {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  private openNativePicker(input?: HTMLInputElement): void {
+    if (!input) {
+      return;
+    }
+    const pickerInput = input as HTMLInputElement & { showPicker?: () => void };
+    if (typeof pickerInput.showPicker === 'function') {
+      pickerInput.showPicker();
+      return;
+    }
+    input.click();
   }
 }

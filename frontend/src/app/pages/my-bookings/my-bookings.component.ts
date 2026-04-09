@@ -35,7 +35,7 @@ import { ToastService } from '../../core/services/toast.service';
                 <tr *ngFor="let b of bookings" class="border-t border-sand/60 hover:bg-cream/50 transition-colors">
                   <td class="px-3 sm:px-4 py-3 font-medium">{{ b.booking_ref }}</td>
                   <td class="px-3 sm:px-4 py-3 hidden sm:table-cell text-muted">{{ b.property_type }}</td>
-                  <td class="px-3 sm:px-4 py-3 text-muted">{{ b.check_in }} – {{ b.check_out }}</td>
+                  <td class="px-3 sm:px-4 py-3 text-muted">{{ formatDate(b.check_in) }} - {{ formatDate(b.check_out) }}</td>
                   <td class="px-3 sm:px-4 py-3 hidden md:table-cell">{{ b.guests }}</td>
                   <td class="px-3 sm:px-4 py-3 font-medium">{{ b.total_amount | currencyInr }}</td>
                   <td class="px-3 sm:px-4 py-3">
@@ -124,6 +124,17 @@ export class MyBookingsComponent {
         this.toast.error('Unable to cancel booking.');
       }
     });
+  }
+
+  formatDate(value: string): string {
+    if (!value) {
+      return '';
+    }
+    const [year, month, day] = value.split('-');
+    if (!year || !month || !day) {
+      return value;
+    }
+    return `${day}/${month}/${year}`;
   }
 }
 

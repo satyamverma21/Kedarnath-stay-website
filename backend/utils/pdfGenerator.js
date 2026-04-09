@@ -1,5 +1,17 @@
 const PDFDocument = require('pdfkit');
 
+function formatDmy(value) {
+  if (!value || typeof value !== 'string') {
+    return value || '';
+  }
+  const datePart = value.includes('T') ? value.split('T')[0] : value;
+  const [year, month, day] = datePart.split('-');
+  if (!year || !month || !day) {
+    return value;
+  }
+  return `${day}/${month}/${year}`;
+}
+
 function generateReceiptPdf(booking, payment, user, property) {
   const doc = new PDFDocument({ margin: 50 });
 
@@ -28,8 +40,8 @@ function generateReceiptPdf(booking, payment, user, property) {
     doc
       .text(`Property: ${property.name}`)
       .text(`Type: ${booking.property_type}`)
-      .text(`Check-in: ${booking.check_in}`)
-      .text(`Check-out: ${booking.check_out}`)
+      .text(`Check-in: ${formatDmy(booking.check_in)}`)
+      .text(`Check-out: ${formatDmy(booking.check_out)}`)
       .text(`Nights: ${booking.nights}`)
       .text(`Guests: ${booking.guests}`)
       .moveDown();

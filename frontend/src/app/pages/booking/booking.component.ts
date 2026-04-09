@@ -55,6 +55,10 @@ type PropertyType = 'room' | 'tent';
         <aside class="card p-5 sm:p-6 h-fit">
           <h2 class="font-semibold text-dark mb-4">Booking Details</h2>
           <div class="space-y-2 text-sm">
+            <div class="flex justify-between gap-4" *ngIf="property.hotel_name">
+              <span class="text-muted">Hotel</span>
+              <span class="text-dark font-medium text-right">{{ property.hotel_name }}</span>
+            </div>
             <div class="flex justify-between gap-4">
               <span class="text-muted">Property</span>
               <span class="text-dark font-medium text-right">{{ property.name }}</span>
@@ -65,11 +69,11 @@ type PropertyType = 'room' | 'tent';
             </div>
             <div class="flex justify-between gap-4">
               <span class="text-muted">Check-in</span>
-              <span class="text-dark text-right">{{ checkIn }}</span>
+              <span class="text-dark text-right">{{ formatDate(checkIn) }}</span>
             </div>
             <div class="flex justify-between gap-4">
               <span class="text-muted">Check-out</span>
-              <span class="text-dark text-right">{{ checkOut }}</span>
+              <span class="text-dark text-right">{{ formatDate(checkOut) }}</span>
             </div>
             <div class="flex justify-between gap-4">
               <span class="text-muted">Guests</span>
@@ -171,6 +175,17 @@ export class BookingComponent {
 
   get totalPrice(): number {
     return Number(this.property?.totalPrice || 0) * this.nights;
+  }
+
+  formatDate(value: string): string {
+    if (!value) {
+      return '';
+    }
+    const [year, month, day] = value.split('-');
+    if (!year || !month || !day) {
+      return value;
+    }
+    return `${day}/${month}/${year}`;
   }
 
   private prefillFromProfile(): void {

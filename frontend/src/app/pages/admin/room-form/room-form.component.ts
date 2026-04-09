@@ -18,6 +18,7 @@ interface AdminRoom {
   type: string;
   description?: string;
   capacity: number;
+  quantity: number;
   registrationAmount: number;
   arrivalAmount: number;
   totalPrice: number;
@@ -74,6 +75,13 @@ interface AdminHotelOption {
             <input type="number" min="1" formControlName="capacity" />
             <div class="text-xs text-red-600" *ngIf="submitted && form.get('capacity')?.invalid">
               Capacity must be at least 1.
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs uppercase mb-1 tracking-widest">Quantity</label>
+            <input type="number" min="1" step="1" formControlName="quantity" />
+            <div class="text-xs text-red-600" *ngIf="submitted && form.get('quantity')?.invalid">
+              Quantity must be at least 1.
             </div>
           </div>
           <div>
@@ -153,6 +161,7 @@ export class RoomFormComponent {
     type: ['standard', Validators.required],
     description: [''],
     capacity: [2, [Validators.required, Validators.min(1)]],
+    quantity: [1, [Validators.required, Validators.min(1)]],
     registrationAmount: [null as number | null, [Validators.required, Validators.min(0.01)]],
     arrivalAmount: [null as number | null, [Validators.required, Validators.min(0.01)]],
     amenities: this.fb.array<string>([]),
@@ -280,6 +289,7 @@ export class RoomFormComponent {
           type: room.type,
           description: room.description || '',
           capacity: room.capacity,
+          quantity: Number((room as any).quantity || 1),
           registrationAmount: room.registrationAmount,
           arrivalAmount: room.arrivalAmount,
           status: room.status
@@ -371,6 +381,7 @@ export class RoomFormComponent {
     }
     const payload: any = {
       ...this.form.value,
+      quantity: Number(this.form.value.quantity || 1),
       amenities: this.amenities.value.map((a: string) => a?.trim()).filter((a: string) => !!a)
     };
 

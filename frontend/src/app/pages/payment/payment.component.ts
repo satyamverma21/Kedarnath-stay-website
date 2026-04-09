@@ -1,7 +1,9 @@
 import { Component } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { BookingService, Booking } from '../../core/services/booking.service';
-import { PaymentService } from '../../core/services/payment.service';
+import { PaymentService, SupportContacts } from '../../core/services/payment.service';
+import { RoomService } from '../../core/services/room.service';
+import { TentService } from '../../core/services/tent.service';
 import { ToastService } from '../../core/services/toast.service';
 
 @Component({
@@ -12,8 +14,11 @@ import { ToastService } from '../../core/services/toast.service';
       <div class="card p-5 sm:p-6 space-y-4 text-sm">
         <div>
           <div class="font-semibold text-dark">Booking {{ booking.booking_ref }}</div>
+          <div class="text-muted mt-1" *ngIf="hotelName">
+            Hotel: {{ hotelName }}
+          </div>
           <div class="text-muted mt-1">
-            {{ booking.check_in }} to {{ booking.check_out }} |
+            {{ formatDate(booking.check_in) }} to {{ formatDate(booking.check_out) }} |
             {{ booking.nights }} nights | {{ booking.guests }} guests
           </div>
         </div>
@@ -37,6 +42,24 @@ import { ToastService } from '../../core/services/toast.service';
         <div class="pt-2">
           <div *ngIf="verificationPending" class="rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-3 py-2 text-sm">
             {{ successMessage || 'Payment submitted. Verification is pending with admin.' }}
+          </div>
+          <div
+            *ngIf="verificationPending && hasAnySupportContact()"
+            class="mt-3 rounded-md border border-sky-300 bg-sky-50 text-sky-900 px-3 py-3 text-sm space-y-2"
+          >
+            <div class="font-semibold">Need help?</div>
+            <div *ngIf="supportContacts.hotelAdminPhone">
+              Hotel contact number:
+              <a class="font-semibold underline" [href]="'tel:' + supportContacts.hotelAdminPhone">
+                {{ supportContacts.hotelAdminPhone }}
+              </a>
+            </div>
+            <div *ngIf="supportContacts.mainAdminPhone">
+              Kedar-stays helpline number:
+              <a class="font-semibold underline" [href]="'tel:' + supportContacts.mainAdminPhone">
+                {{ supportContacts.mainAdminPhone }}
+              </a>
+            </div>
           </div>
 
           <div *ngIf="!verificationPending && isDesktop; else mobilePayment" class="space-y-4">
@@ -149,6 +172,7 @@ import { ToastService } from '../../core/services/toast.service';
 export class PaymentComponent {
   bookingId!: number;
   booking: Booking | null = null;
+  hotelName = '';
   loading = false;
   error = '';
   guestPhone = '';
@@ -162,6 +186,7 @@ export class PaymentComponent {
   generatedLoginId = '';
   generatedPassword = '';
   showGeneratedCredentials = false;
+  supportContacts: SupportContacts = { hotelAdminPhone: '', mainAdminPhone: '' };
   paytmQrPath = 'assets/payments/paytm-qr.png';
   phonepeQrPath = 'assets/payments/phonepe-qr.png';
   selectedMethod: 'paytm' | 'phonepe' | 'upi' = 'upi';
@@ -172,6 +197,8 @@ export class PaymentComponent {
     private route: ActivatedRoute,
     private bookingService: BookingService,
     private paymentService: PaymentService,
+    private roomService: RoomService,
+    private tentService: TentService,
     private toast: ToastService
   ) {
     this.isDesktop = this.detectDesktop();
@@ -232,6 +259,7 @@ export class PaymentComponent {
     request.subscribe({
       next: (booking) => {
         this.booking = booking;
+        this.loadHotelName();
         this.preparePaymentLinks();
       },
       error: () => {
@@ -254,6 +282,7 @@ export class PaymentComponent {
       this.verificationPending = true;
       this.loading = false;
       this.successMessage = 'Payment already submitted. Admin verification is pending.';
+      this.loadSupportContacts();
       return;
     }
     this.verificationPending = false;
@@ -277,6 +306,27 @@ export class PaymentComponent {
       error: (err) => {
         this.loading = false;
         this.error = err?.error?.message || 'Unable to generate payment links.';
+      }
+    });
+  }
+
+  private loadHotelName(): void {
+    if (!this.booking) {
+      this.hotelName = '';
+      return;
+    }
+
+    const request =
+      this.booking.property_type === 'room'
+        ? this.roomService.getRoom(this.booking.property_id)
+        : this.tentService.getTent(this.booking.property_id);
+
+    request.subscribe({
+      next: (property) => {
+        this.hotelName = (property.hotel_name || '').trim();
+      },
+      error: () => {
+        this.hotelName = '';
       }
     });
   }
@@ -323,6 +373,12 @@ export class PaymentComponent {
           if (resp?.booking) {
             this.booking = resp.booking;
           }
+          if (resp?.supportContacts) {
+            this.supportContacts = {
+              hotelAdminPhone: (resp.supportContacts.hotelAdminPhone || '').trim(),
+              mainAdminPhone: (resp.supportContacts.mainAdminPhone || '').trim()
+            };
+          }
           this.verificationPending = true;
           this.successMessage =
             resp?.message || 'Payment submitted. Verification is pending with admin.';
@@ -334,6 +390,24 @@ export class PaymentComponent {
           this.toast.error(this.error);
         }
       });
+  }
+
+  hasAnySupportContact(): boolean {
+    return !!(this.supportContacts.hotelAdminPhone || this.supportContacts.mainAdminPhone);
+  }
+
+  private loadSupportContacts(): void {
+    this.paymentService.getPaymentByBooking(this.bookingId, this.guestPhone || undefined).subscribe({
+      next: (resp) => {
+        this.supportContacts = {
+          hotelAdminPhone: (resp?.supportContacts?.hotelAdminPhone || '').trim(),
+          mainAdminPhone: (resp?.supportContacts?.mainAdminPhone || '').trim()
+        };
+      },
+      error: () => {
+        this.supportContacts = { hotelAdminPhone: '', mainAdminPhone: '' };
+      }
+    });
   }
 
   private extractUpiId(link?: string): string {
@@ -352,5 +426,16 @@ export class PaymentComponent {
     const isMobileUa = /Android|iPhone|iPad|iPod|Windows Phone|Mobile/i.test(ua);
     const smallScreen = window.innerWidth < 992;
     return !isMobileUa && !smallScreen;
+  }
+
+  formatDate(value: string): string {
+    if (!value) {
+      return '';
+    }
+    const [year, month, day] = value.split('-');
+    if (!year || !month || !day) {
+      return value;
+    }
+    return `${day}/${month}/${year}`;
   }
 }

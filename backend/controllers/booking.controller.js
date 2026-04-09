@@ -55,6 +55,37 @@ function getPriceForProperty(db, propertyType, propertyId, nights) {
   };
 }
 
+function hasInventoryForDates(db, propertyType, propertyId, checkIn, checkOut) {
+  if (propertyType === 'room') {
+    const room = db.prepare('SELECT quantity FROM rooms WHERE id = ?').get(propertyId);
+    if (!room) {
+      return false;
+    }
+    const totalInventory = Math.max(Number(room.quantity || 1), 1);
+    const overlappingCount = db
+      .prepare(
+        `SELECT COUNT(*) as c FROM bookings
+         WHERE property_type = 'room'
+           AND property_id = ?
+           AND status != 'cancelled'
+           AND NOT (date(check_out) <= date(?) OR date(check_in) >= date(?))`
+      )
+      .get(propertyId, checkIn, checkOut).c;
+    return overlappingCount < totalInventory;
+  }
+
+  const overlapping = db
+    .prepare(
+      `SELECT 1 FROM bookings
+       WHERE property_type = ?
+         AND property_id = ?
+         AND status != 'cancelled'
+         AND NOT (date(check_out) <= date(?) OR date(check_in) >= date(?))`
+    )
+    .get(propertyType, propertyId, checkIn, checkOut);
+  return !overlapping;
+}
+
 function generateBookingRef(db, id) {
   const year = new Date().getFullYear();
   const padded = String(id).padStart(5, '0');
@@ -164,17 +195,7 @@ async function createBooking(req, res) {
       return res.status(400).json({ message: 'Checkout must be after checkin' });
     }
 
-    const overlapping = db
-      .prepare(
-        `SELECT 1 FROM bookings
-         WHERE property_type = ?
-           AND property_id = ?
-           AND status != 'cancelled'
-           AND NOT (date(check_out) <= date(?) OR date(check_in) >= date(?))`
-      )
-      .get(propertyType, propertyId, checkIn, checkOut);
-
-    if (overlapping) {
+    if (!hasInventoryForDates(db, propertyType, propertyId, checkIn, checkOut)) {
       return res.status(400).json({ message: 'Selected dates are not available' });
     }
 
@@ -389,17 +410,7 @@ async function createGuestBooking(req, res) {
       return res.status(400).json({ message: 'Checkout must be after checkin' });
     }
 
-    const overlapping = db
-      .prepare(
-        `SELECT 1 FROM bookings
-         WHERE property_type = ?
-           AND property_id = ?
-           AND status != 'cancelled'
-           AND NOT (date(check_out) <= date(?) OR date(check_in) >= date(?))`
-      )
-      .get(propertyType, propertyId, checkIn, checkOut);
-
-    if (overlapping) {
+    if (!hasInventoryForDates(db, propertyType, propertyId, checkIn, checkOut)) {
       return res.status(400).json({ message: 'Selected dates are not available' });
     }
 

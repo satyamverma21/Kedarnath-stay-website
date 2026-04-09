@@ -10,6 +10,19 @@ function getTodayDateString() {
   return d.toISOString().slice(0, 10);
 }
 
+function addDaysToDateString(dateText, days) {
+  const date = new Date(`${dateText}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return getTodayDateString();
+  }
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function isValidDateString(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
 function getBookingHotelId(db, booking) {
   if (!booking || !booking.property_type || !booking.property_id) {
     return null;
@@ -493,6 +506,159 @@ async function listRooms(req, res) {
   }
 }
 
+async function listInventory(req, res) {
+  try {
+    const db = getDb();
+    const isHotelAdmin = req.user.role === 'hotel-admin';
+    const userHotelId = req.user.hotelId ? Number(req.user.hotelId) : null;
+    if (isHotelAdmin && !userHotelId) {
+      return res.status(400).json({ message: 'Hotel not assigned to this user' });
+    }
+
+    const requestedFrom = isValidDateString(req.query.from)
+      ? String(req.query.from)
+      : getTodayDateString();
+    const requestedTo = isValidDateString(req.query.to)
+      ? String(req.query.to)
+      : addDaysToDateString(requestedFrom, 1);
+    if (requestedTo <= requestedFrom) {
+      return res.status(400).json({ message: '`to` date must be after `from` date' });
+    }
+
+    const requestedHotelId = req.query.hotelId ? Number(req.query.hotelId) : null;
+    const selectedHotelId = isHotelAdmin ? userHotelId : requestedHotelId;
+    const type = req.query.type ? String(req.query.type).trim() : '';
+    const status = req.query.status ? String(req.query.status).trim() : '';
+    const search = req.query.search ? String(req.query.search).trim() : '';
+
+    let query = `SELECT r.id,
+                        r.name,
+                        r.type,
+                        r.status,
+                        r.capacity,
+                        r.quantity,
+                        r.registrationAmount,
+                        r.arrivalAmount,
+                        r.totalPrice,
+                        r.hotel_id,
+                        h.name as hotel_name
+                 FROM rooms r
+                 LEFT JOIN hotels h ON h.id = r.hotel_id
+                 WHERE 1 = 1`;
+    const params = [];
+
+    if (selectedHotelId) {
+      query += ' AND r.hotel_id = ?';
+      params.push(selectedHotelId);
+    }
+    if (type) {
+      query += ' AND r.type = ?';
+      params.push(type);
+    }
+    if (status) {
+      query += ' AND r.status = ?';
+      params.push(status);
+    }
+    if (search) {
+      query += ' AND (r.name LIKE ? OR r.type LIKE ? OR h.name LIKE ?)';
+      const like = `%${search}%`;
+      params.push(like, like, like);
+    }
+
+    query += " ORDER BY COALESCE(h.name, 'Unassigned'), r.name";
+    const rooms = db.prepare(query).all(...params);
+
+    const overlapStmt = db.prepare(
+      `SELECT COUNT(*) as c
+       FROM bookings
+       WHERE property_type = 'room'
+         AND property_id = ?
+         AND status != 'cancelled'
+         AND NOT (date(check_out) <= date(?) OR date(check_in) >= date(?))`
+    );
+
+    const rows = rooms.map((room) => {
+      const registeredQuantity = Math.max(Number(room.quantity || 1), 1);
+      const rawBookedQuantity = Number(overlapStmt.get(room.id, requestedFrom, requestedTo).c || 0);
+      const bookedQuantity = Math.min(rawBookedQuantity, registeredQuantity);
+      const availableQuantity = Math.max(registeredQuantity - bookedQuantity, 0);
+      const occupancyPercent = registeredQuantity
+        ? Number(((bookedQuantity / registeredQuantity) * 100).toFixed(2))
+        : 0;
+
+      return {
+        room_id: room.id,
+        room_name: room.name,
+        room_type: room.type,
+        room_status: room.status,
+        capacity: Number(room.capacity || 0),
+        hotel_id: room.hotel_id,
+        hotel_name: room.hotel_name || 'Unassigned',
+        registered_quantity: registeredQuantity,
+        booked_quantity: bookedQuantity,
+        available_quantity: availableQuantity,
+        occupancy_percent: occupancyPercent,
+        registration_amount: Number(room.registrationAmount || 0),
+        arrival_amount: Number(room.arrivalAmount || 0),
+        total_price: Number(room.totalPrice || 0)
+      };
+    });
+
+    const hotelSummaryMap = new Map();
+    rows.forEach((row) => {
+      const key = `${row.hotel_id || 0}:${row.hotel_name}`;
+      if (!hotelSummaryMap.has(key)) {
+        hotelSummaryMap.set(key, {
+          hotel_id: row.hotel_id,
+          hotel_name: row.hotel_name,
+          room_types: 0,
+          registered_quantity: 0,
+          booked_quantity: 0,
+          available_quantity: 0,
+          occupancy_percent: 0
+        });
+      }
+      const bucket = hotelSummaryMap.get(key);
+      bucket.room_types += 1;
+      bucket.registered_quantity += row.registered_quantity;
+      bucket.booked_quantity += row.booked_quantity;
+      bucket.available_quantity += row.available_quantity;
+    });
+
+    const hotelSummary = Array.from(hotelSummaryMap.values())
+      .map((hotel) => ({
+        ...hotel,
+        occupancy_percent: hotel.registered_quantity
+          ? Number(((hotel.booked_quantity / hotel.registered_quantity) * 100).toFixed(2))
+          : 0
+      }))
+      .sort((a, b) => a.hotel_name.localeCompare(b.hotel_name));
+
+    const totalRegistered = rows.reduce((sum, row) => sum + row.registered_quantity, 0);
+    const totalBooked = rows.reduce((sum, row) => sum + row.booked_quantity, 0);
+
+    return res.json({
+      period: {
+        from: requestedFrom,
+        to: requestedTo
+      },
+      summary: {
+        room_types: rows.length,
+        hotels: hotelSummary.length,
+        registered_quantity: totalRegistered,
+        booked_quantity: totalBooked,
+        available_quantity: Math.max(totalRegistered - totalBooked, 0),
+        occupancy_percent: totalRegistered ? Number(((totalBooked / totalRegistered) * 100).toFixed(2)) : 0
+      },
+      hotelSummary,
+      rows
+    });
+  } catch (err) {
+    console.error('Admin inventory error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 async function createRoom(req, res) {
   try {
     const {
@@ -500,6 +666,7 @@ async function createRoom(req, res) {
       type,
       description,
       capacity,
+      quantity,
       registrationAmount,
       arrivalAmount,
       amenities,
@@ -517,6 +684,10 @@ async function createRoom(req, res) {
       return res
         .status(400)
         .json({ message: 'registrationAmount and arrivalAmount must be greater than 0' });
+    }
+    const roomQuantity = quantity != null ? Number(quantity) : 1;
+    if (!Number.isInteger(roomQuantity) || roomQuantity <= 0) {
+      return res.status(400).json({ message: 'quantity must be a positive whole number' });
     }
     const db = getDb();
     const totalPrice = registration + arrival;
@@ -536,17 +707,18 @@ async function createRoom(req, res) {
 
     const stmt = db.prepare(
       `INSERT INTO rooms (
-        name, type, description, capacity,
+        name, type, description, capacity, quantity,
         basePrice, registrationAmount, arrivalAmount, totalPrice,
         amenities, status, hotel_id
       )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     const info = stmt.run(
       name,
       type,
       description || null,
       capacity || 2,
+      roomQuantity,
       totalPrice,
       registration,
       arrival,
@@ -566,7 +738,17 @@ async function createRoom(req, res) {
 async function updateRoom(req, res) {
   try {
     const id = Number(req.params.id);
-    const { name, type, description, capacity, registrationAmount, arrivalAmount, amenities, status } = req.body;
+    const {
+      name,
+      type,
+      description,
+      capacity,
+      quantity,
+      registrationAmount,
+      arrivalAmount,
+      amenities,
+      status
+    } = req.body;
     const db = getDb();
     const existing = db.prepare('SELECT * FROM rooms WHERE id = ?').get(id);
     if (!existing) {
@@ -593,11 +775,15 @@ async function updateRoom(req, res) {
         .status(400)
         .json({ message: 'registrationAmount and arrivalAmount must be greater than 0' });
     }
+    const nextQuantity = quantity != null ? Number(quantity) : Number(existing.quantity || 1);
+    if (!Number.isInteger(nextQuantity) || nextQuantity <= 0) {
+      return res.status(400).json({ message: 'quantity must be a positive whole number' });
+    }
     const nextTotal = nextRegistration + nextArrival;
 
     const stmt = db.prepare(
       `UPDATE rooms SET 
-        name = ?, type = ?, description = ?, capacity = ?, 
+        name = ?, type = ?, description = ?, capacity = ?, quantity = ?,
         basePrice = ?, registrationAmount = ?, arrivalAmount = ?, totalPrice = ?, amenities = ?, status = ?
        WHERE id = ?`
     );
@@ -606,6 +792,7 @@ async function updateRoom(req, res) {
       type ?? existing.type,
       description ?? existing.description,
       capacity ?? existing.capacity,
+      nextQuantity,
       nextTotal,
       nextRegistration,
       nextArrival,
@@ -1379,6 +1566,7 @@ async function getAgentStats(req, res) {
 module.exports = {
   getDashboard,
   listRooms,
+  listInventory,
   createRoom,
   updateRoom,
   deleteRoom,

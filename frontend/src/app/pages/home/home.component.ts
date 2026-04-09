@@ -102,8 +102,11 @@ import { environment } from '../../../environments/environment';
           *ngFor="let room of featuredRooms"
           [name]="room.name"
           [type]="room.type"
+          [hotelName]="room.hotel_name || null"
+          [description]="room.description || null"
           [capacity]="room.capacity"
           [price]="room.totalPrice"
+          [amenities]="room.amenities"
           [images]="room.images"
           (book)="goToProperty('room', room.id)"
         ></app-property-card>
@@ -118,8 +121,11 @@ import { environment } from '../../../environments/environment';
           *ngFor="let tent of featuredTents"
           [name]="tent.name"
           [type]="tent.type"
+          [hotelName]="tent.hotel_name || null"
+          [description]="tent.description || null"
           [capacity]="tent.capacity"
           [price]="tent.totalPrice"
+          [amenities]="tent.amenities"
           [images]="tent.images"
           (book)="goToProperty('tent', tent.id)"
         ></app-property-card>

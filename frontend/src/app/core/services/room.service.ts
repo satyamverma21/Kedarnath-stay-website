@@ -12,9 +12,11 @@ export interface PropertyImage {
 export interface Room {
   id: number;
   name: string;
+  hotel_name?: string | null;
   type: string;
   description?: string;
   capacity: number;
+  quantity: number;
   registrationAmount: number;
   arrivalAmount: number;
   totalPrice: number;

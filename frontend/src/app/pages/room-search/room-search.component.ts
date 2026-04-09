@@ -65,8 +65,11 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
             *ngFor="let room of rooms"
             [name]="room.name"
             [type]="room.type"
+            [hotelName]="room.hotel_name || null"
+            [description]="room.description || null"
             [capacity]="room.capacity"
             [price]="room.totalPrice"
+            [amenities]="room.amenities"
             [images]="room.images"
             (book)="goToRoom(room.id)"
           ></app-property-card>

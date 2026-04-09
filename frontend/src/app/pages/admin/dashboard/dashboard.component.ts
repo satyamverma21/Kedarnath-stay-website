@@ -162,7 +162,7 @@ export class DashboardComponent {
   hotelBookingGroups: HotelBookingGroup[] = [];
   private readonly dateFormatter = new Intl.DateTimeFormat('en-IN', {
     day: '2-digit',
-    month: 'short',
+    month: '2-digit',
     year: 'numeric'
   });
 
@@ -274,7 +274,7 @@ export class DashboardComponent {
     if (!value) {
       return '-';
     }
-    const parsed = new Date(value);
+    const parsed = new Date(`${value}T00:00:00`);
     if (Number.isNaN(parsed.getTime())) {
       return value;
     }

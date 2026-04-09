@@ -7,6 +7,7 @@ import { PropertyImage } from './room.service';
 export interface Tent {
   id: number;
   name: string;
+  hotel_name?: string | null;
   type: string;
   description?: string;
   capacity: number;
