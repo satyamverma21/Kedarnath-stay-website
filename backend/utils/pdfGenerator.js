@@ -52,7 +52,7 @@ function generateReceiptPdf(booking, payment, user, property) {
 
     doc.text('Amount Breakdown', { underline: true });
     doc
-      .text(`Paid Now (Registration): INR ${paidNow.toFixed(2)}`)
+      .text(`Paid Now (Downpayment): INR ${paidNow.toFixed(2)}`)
       .text(`Due on Arrival (Cash): INR ${dueOnArrival.toFixed(2)}`)
       .text(`Total Booking Amount: INR ${total.toFixed(2)}`)
       .moveDown();

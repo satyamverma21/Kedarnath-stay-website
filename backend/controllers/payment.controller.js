@@ -162,7 +162,7 @@ async function createPaymentOrder(req, res) {
     const arrivalAmount = Number(booking.arrival_amount || 0);
     const totalAmount = Number(booking.total_amount || registrationAmount + arrivalAmount);
     if (registrationAmount <= 0) {
-      return res.status(400).json({ message: 'Invalid registration amount for this booking' });
+      return res.status(400).json({ message: 'Invalid downpayment amount for this booking' });
     }
 
     const paytmUpiId = String(process.env.PAYTM_UPI_ID || '').trim();

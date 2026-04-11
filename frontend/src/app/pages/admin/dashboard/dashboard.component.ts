@@ -30,7 +30,9 @@ interface BookingRow {
   property_type: string;
   check_in: string;
   check_out: string;
+  registration_amount?: number;
   arrival_amount: number;
+  payment_status?: string;
   status: string;
   hotel_name?: string | null;
 }
@@ -62,7 +64,9 @@ interface HotelBookingGroup {
           <div class="text-2xl font-semibold">{{ data.totalBookings }}</div>
         </div>
         <div class="card p-4 text-sm">
-          <div class="text-muted text-xs uppercase tracking-widest">This Month Revenue</div>
+          <div class="text-muted text-xs uppercase tracking-widest">
+            {{ isHotelAdmin ? 'This Month Cash Revenue' : 'This Month Downpayment Revenue' }}
+          </div>
           <div class="text-2xl font-semibold">{{ data.thisMonthRevenue | currencyInr }}</div>
         </div>
         <div class="card p-4 text-sm">
@@ -125,6 +129,7 @@ interface HotelBookingGroup {
                   <th>Guest</th>
                   <th>Contact Number (Booking)</th>
                   <th>Stay</th>
+                  <th *ngIf="!isHotelAdmin">Downpayment Received</th>
                   <th>Due On Arrival</th>
                   <th>Status</th>
                 </tr>
@@ -142,6 +147,7 @@ interface HotelBookingGroup {
                     <div class="font-medium">{{ b.property_name || '-' }} <span class="admin-subtext">({{ b.property_type }})</span></div>
                     <div class="admin-subtext">{{ formatDateRange(b.check_in, b.check_out) }}</div>
                   </td>
+                  <td *ngIf="!isHotelAdmin" class="font-semibold">{{ downpaymentReceived(b) | currencyInr }}</td>
                   <td class="font-semibold">{{ b.arrival_amount | currencyInr }}</td>
                   <td>
                     <span class="status-pill" [ngClass]="statusClass(b.status)">{{ b.status }}</span>
@@ -159,6 +165,7 @@ export class DashboardComponent {
   data: DashboardData | null = null;
   loading = false;
   hotelName: string | null = null;
+  isHotelAdmin = false;
   hotelBookingGroups: HotelBookingGroup[] = [];
   private readonly dateFormatter = new Intl.DateTimeFormat('en-IN', {
     day: '2-digit',
@@ -189,9 +196,11 @@ export class DashboardComponent {
     this.http.get<any>(`${environment.apiUrl}/auth/me`).subscribe({
       next: (u) => {
         this.hotelName = u.hotel_name || null;
+        this.isHotelAdmin = u?.role === 'hotel-admin';
       },
       error: () => {
         this.hotelName = null;
+        this.isHotelAdmin = false;
       }
     });
   }
@@ -288,5 +297,9 @@ export class DashboardComponent {
     if (normalized === 'cancelled') return 'cancelled';
     if (normalized === 'completed') return 'completed';
     return 'read';
+  }
+
+  downpaymentReceived(booking: BookingRow): number {
+    return booking.payment_status === 'paid' ? Number(booking.registration_amount || 0) : 0;
   }
 }

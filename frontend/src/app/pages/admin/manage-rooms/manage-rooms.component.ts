@@ -47,7 +47,7 @@ interface AdminRoom {
                 <th>Type</th>
                 <th>Capacity</th>
                 <th>Qty</th>
-                <th>Reg.</th>
+                <th>Downpayment</th>
                 <th>Arrival</th>
                 <th>Total</th>
                 <th>Status</th>

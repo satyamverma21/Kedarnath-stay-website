@@ -115,7 +115,7 @@ type BookedDateRange = {
                 <span class="text-sm text-muted font-normal ml-1">total</span>
               </div>
               <div class="text-xs text-muted mt-1">
-                {{ property.registrationAmount | currencyInr }} now + {{ property.arrivalAmount | currencyInr }} on arrival
+                {{ property.registrationAmount | currencyInr }} downpayment + {{ property.arrivalAmount | currencyInr }} on arrival
               </div>
             </div>
             <form [formGroup]="bookingForm" (ngSubmit)="goToBooking()" class="space-y-4">

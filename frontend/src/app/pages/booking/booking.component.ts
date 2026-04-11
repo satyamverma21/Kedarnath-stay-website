@@ -84,7 +84,7 @@ type PropertyType = 'room' | 'tent';
               <span class="text-dark text-right">{{ nights }}</span>
             </div>
             <div class="flex justify-between gap-4">
-              <span class="text-muted">Registration Fee (Pay Now)</span>
+              <span class="text-muted">Downpayment (Pay Now)</span>
               <span class="text-dark text-right">{{ registrationTotal | currencyInr }}</span>
             </div>
             <div class="flex justify-between gap-4">

@@ -20,10 +20,11 @@ interface AdminBooking {
   property_type: string;
   check_in: string;
   check_out: string;
-  total_amount: number;
+  total_amount?: number;
+  registration_amount?: number;
   due_on_arrival?: number;
   status: string;
-  payment_status: string;
+  payment_status?: string;
   payment_record_status?: string;
   submitted_transaction_id?: string;
   submitted_method?: string;
@@ -69,7 +70,7 @@ interface AdminHotel {
             </select>
           </div>
 
-          <div>
+          <div *ngIf="!isHotelAdmin">
             <label class="block text-xs uppercase mb-1 tracking-widest text-muted">Payment</label>
             <select [(ngModel)]="filter.paymentStatus" class="w-full">
               <option value="">All</option>
@@ -140,9 +141,10 @@ interface AdminHotel {
                 <th>Guest</th>
                 <th>Contact Number (Booking)</th>
                 <th>Stay</th>
+                <th *ngIf="!isHotelAdmin">Downpayment Received</th>
                 <th>Due On Arrival</th>
                 <th>Booking Status</th>
-                <th>Payment</th>
+                <th>{{ isHotelAdmin ? 'Cash Payment' : 'Payment' }}</th>
                 <th *ngIf="!isHotelAdmin">Actions</th>
               </tr>
             </thead>
@@ -161,6 +163,9 @@ interface AdminHotel {
                   <div class="font-medium">{{ b.property_name || '-' }} <span class="admin-subtext">({{ b.property_type }})</span></div>
                   <div class="admin-subtext">{{ formatDateRange(b.check_in, b.check_out) }}</div>
                 </td>
+                <td *ngIf="!isHotelAdmin">
+                  <div class="font-semibold">{{ downpaymentReceived(b) | currencyInr }}</div>
+                </td>
                 <td>
                   <div class="font-semibold">{{ (b.due_on_arrival ?? b.total_amount) | currencyInr }}</div>
                 </td>
@@ -168,15 +173,20 @@ interface AdminHotel {
                   <span class="status-pill" [ngClass]="statusClass(b.status)">{{ b.status }}</span>
                 </td>
                 <td>
-                  <div>
-                    <span class="status-pill" [ngClass]="statusClass(b.payment_status)">{{ b.payment_status }}</span>
-                  </div>
-                  <div class="admin-subtext mt-1" *ngIf="b.submitted_transaction_id">
-                    Txn: {{ b.submitted_transaction_id }}
-                  </div>
-                  <div class="admin-subtext" *ngIf="b.submitted_method">
-                    Method: {{ b.submitted_method }}
-                  </div>
+                  <ng-container *ngIf="isHotelAdmin; else fullPaymentDetails">
+                    <span class="status-pill confirmed">Cash on Arrival</span>
+                  </ng-container>
+                  <ng-template #fullPaymentDetails>
+                    <div>
+                      <span class="status-pill" [ngClass]="statusClass(b.payment_status || '')">{{ b.payment_status }}</span>
+                    </div>
+                    <div class="admin-subtext mt-1" *ngIf="b.submitted_transaction_id">
+                      Txn: {{ b.submitted_transaction_id }}
+                    </div>
+                    <div class="admin-subtext" *ngIf="b.submitted_method">
+                      Method: {{ b.submitted_method }}
+                    </div>
+                  </ng-template>
                 </td>
                 <td *ngIf="!isHotelAdmin">
                   <div class="admin-actions">
@@ -260,7 +270,7 @@ export class BookingsListComponent {
     } else if (this.filter.status) {
       params = params.set('status', this.filter.status);
     }
-    if (this.filter.paymentStatus) params = params.set('paymentStatus', this.filter.paymentStatus);
+    if (!this.isHotelAdmin && this.filter.paymentStatus) params = params.set('paymentStatus', this.filter.paymentStatus);
     if (this.filter.propertyType) params = params.set('propertyType', this.filter.propertyType);
     if (!this.isHotelAdmin && this.filter.hotelId) params = params.set('hotelId', this.filter.hotelId);
     if (this.filter.from) params = params.set('from', this.filter.from);
@@ -371,5 +381,9 @@ export class BookingsListComponent {
     if (['completed', 'replied'].includes(normalized)) return 'completed';
     if (normalized === 'read') return 'read';
     return 'read';
+  }
+
+  downpaymentReceived(booking: AdminBooking): number {
+    return booking.payment_status === 'paid' ? Number(booking.registration_amount || 0) : 0;
   }
 }

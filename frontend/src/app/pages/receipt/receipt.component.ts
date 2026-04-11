@@ -17,7 +17,7 @@ import { environment } from '../../../environments/environment';
         </div>
         <div class="border-t border-sand pt-4 mb-6 text-sm space-y-2">
           <div class="flex justify-between">
-            <span class="text-muted">Amount Paid Now</span>
+            <span class="text-muted">Downpayment Paid</span>
             <span>{{ booking.registration_amount | currencyInr }}</span>
           </div>
           <div class="flex justify-between">

@@ -85,10 +85,10 @@ interface AdminHotelOption {
             </div>
           </div>
           <div>
-            <label class="block text-xs uppercase mb-1 tracking-widest">Registration Amount</label>
+            <label class="block text-xs uppercase mb-1 tracking-widest">Downpayment Amount</label>
             <input type="number" min="0" formControlName="registrationAmount" />
             <div class="text-xs text-red-600" *ngIf="submitted && form.get('registrationAmount')?.invalid">
-              Registration amount must be greater than 0.
+              Downpayment amount must be greater than 0.
             </div>
           </div>
           <div>

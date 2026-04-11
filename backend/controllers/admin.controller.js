@@ -68,6 +68,7 @@ async function getDashboard(req, res) {
   try {
     const db = getDb();
     const isHotelAdmin = req.user.role === 'hotel-admin';
+    const revenueAmountColumn = isHotelAdmin ? 'b.arrival_amount' : 'b.registration_amount';
     const hotelId = req.user.hotelId ? Number(req.user.hotelId) : null;
     if (isHotelAdmin && !hotelId) {
       return res.status(400).json({ message: 'Hotel not assigned to this user' });
@@ -87,11 +88,10 @@ async function getDashboard(req, res) {
     const monthStartStr = thisMonthStart.toISOString().slice(0, 10);
     const thisMonthRevenue = db
       .prepare(
-        `SELECT IFNULL(SUM(b.total_amount), 0) as revenue
+        `SELECT IFNULL(SUM(CASE WHEN b.payment_status = 'paid' THEN ${revenueAmountColumn} ELSE 0 END), 0) as revenue
          FROM bookings b
          ${scopedJoin}
-         WHERE b.payment_status = 'paid'
-           AND date(b.created_at) >= date(?)
+         WHERE date(b.created_at) >= date(?)
            ${isHotelAdmin ? 'AND COALESCE(r.hotel_id, t.hotel_id) = ?' : ''}`
       )
       .get(...(isHotelAdmin ? [monthStartStr, hotelId] : [monthStartStr])).revenue;
@@ -153,13 +153,28 @@ async function getDashboard(req, res) {
       )
       .all(...(isHotelAdmin ? [hotelId] : []));
 
+    const scopedRecentBookings = isHotelAdmin
+      ? recentBookings.map((booking) => ({
+          booking_ref: booking.booking_ref,
+          guest_name: booking.guest_name,
+          guest_phone: booking.guest_phone,
+          property_name: booking.property_name,
+          property_type: booking.property_type,
+          check_in: booking.check_in,
+          check_out: booking.check_out,
+          arrival_amount: Number(booking.arrival_amount || 0),
+          status: booking.status,
+          hotel_name: booking.hotel_name
+        }))
+      : recentBookings;
+
     const hotelWiseSummary = db
       .prepare(
         `SELECT COALESCE(h.name, 'Unassigned') as hotel_name,
                 COUNT(*) as total_bookings,
                 SUM(CASE WHEN b.status = 'confirmed' THEN 1 ELSE 0 END) as confirmed_bookings,
                 SUM(CASE WHEN b.status = 'pending' THEN 1 ELSE 0 END) as pending_bookings,
-                IFNULL(SUM(CASE WHEN b.payment_status = 'paid' THEN b.total_amount ELSE 0 END), 0) as paid_revenue
+                IFNULL(SUM(CASE WHEN b.payment_status = 'paid' THEN ${revenueAmountColumn} ELSE 0 END), 0) as paid_revenue
          FROM bookings b
          LEFT JOIN rooms r ON b.property_type = 'room' AND r.id = b.property_id
          LEFT JOIN tents t ON b.property_type = 'tent' AND t.id = b.property_id
@@ -176,7 +191,7 @@ async function getDashboard(req, res) {
       thisMonthRevenue,
       occupancy: Number(occupancy.toFixed(2)),
       pendingEnquiries,
-      recentBookings,
+      recentBookings: scopedRecentBookings,
       hotelWiseSummary
     });
   } catch (err) {
@@ -678,12 +693,12 @@ async function createRoom(req, res) {
     if (!name || !type || !Number.isFinite(registration) || !Number.isFinite(arrival)) {
       return res
         .status(400)
-        .json({ message: 'Name, type, registrationAmount and arrivalAmount are required for a room' });
+        .json({ message: 'Name, type, downpaymentAmount and arrivalAmount are required for a room' });
     }
     if (registration <= 0 || arrival <= 0) {
       return res
         .status(400)
-        .json({ message: 'registrationAmount and arrivalAmount must be greater than 0' });
+        .json({ message: 'downpaymentAmount and arrivalAmount must be greater than 0' });
     }
     const roomQuantity = quantity != null ? Number(quantity) : 1;
     if (!Number.isInteger(roomQuantity) || roomQuantity <= 0) {
@@ -768,12 +783,12 @@ async function updateRoom(req, res) {
     if (!Number.isFinite(nextRegistration) || !Number.isFinite(nextArrival)) {
       return res
         .status(400)
-        .json({ message: 'registrationAmount and arrivalAmount must be valid numbers' });
+        .json({ message: 'downpaymentAmount and arrivalAmount must be valid numbers' });
     }
     if (nextRegistration <= 0 || nextArrival <= 0) {
       return res
         .status(400)
-        .json({ message: 'registrationAmount and arrivalAmount must be greater than 0' });
+        .json({ message: 'downpaymentAmount and arrivalAmount must be greater than 0' });
     }
     const nextQuantity = quantity != null ? Number(quantity) : Number(existing.quantity || 1);
     if (!Number.isInteger(nextQuantity) || nextQuantity <= 0) {
@@ -984,12 +999,12 @@ async function createTent(req, res) {
     if (!name || !type || !Number.isFinite(registration) || !Number.isFinite(arrival)) {
       return res
         .status(400)
-        .json({ message: 'Name, type, registrationAmount and arrivalAmount are required for a tent' });
+        .json({ message: 'Name, type, downpaymentAmount and arrivalAmount are required for a tent' });
     }
     if (registration <= 0 || arrival <= 0) {
       return res
         .status(400)
-        .json({ message: 'registrationAmount and arrivalAmount must be greater than 0' });
+        .json({ message: 'downpaymentAmount and arrivalAmount must be greater than 0' });
     }
     const db = getDb();
     const totalPrice = registration + arrival;
@@ -1058,12 +1073,12 @@ async function updateTent(req, res) {
     if (!Number.isFinite(nextRegistration) || !Number.isFinite(nextArrival)) {
       return res
         .status(400)
-        .json({ message: 'registrationAmount and arrivalAmount must be valid numbers' });
+        .json({ message: 'downpaymentAmount and arrivalAmount must be valid numbers' });
     }
     if (nextRegistration <= 0 || nextArrival <= 0) {
       return res
         .status(400)
-        .json({ message: 'registrationAmount and arrivalAmount must be greater than 0' });
+        .json({ message: 'downpaymentAmount and arrivalAmount must be greater than 0' });
     }
     const nextTotal = nextRegistration + nextArrival;
 
@@ -1269,7 +1284,7 @@ async function listAdminBookings(req, res) {
       query += ' AND b.property_type = ?';
       params.push(propertyType);
     }
-    if (paymentStatus) {
+    if (!isHotelAdmin && paymentStatus) {
       query += ' AND b.payment_status = ?';
       params.push(paymentStatus);
     }
@@ -1298,7 +1313,24 @@ async function listAdminBookings(req, res) {
     query += ' ORDER BY b.created_at DESC';
 
     const bookings = db.prepare(query).all(...params);
-    return res.json(bookings);
+    if (!isHotelAdmin) {
+      return res.json(bookings);
+    }
+
+    const hotelAdminBookings = bookings.map((booking) => ({
+      id: booking.id,
+      booking_ref: booking.booking_ref,
+      guest_name: booking.guest_name,
+      guest_phone: booking.guest_phone,
+      hotel_name: booking.hotel_name,
+      property_name: booking.property_name,
+      property_type: booking.property_type,
+      check_in: booking.check_in,
+      check_out: booking.check_out,
+      due_on_arrival: Number(booking.due_on_arrival || booking.arrival_amount || 0),
+      status: booking.status
+    }));
+    return res.json(hotelAdminBookings);
   } catch (err) {
     console.error('Admin list bookings error', err);
     return res.status(500).json({ message: 'Internal server error' });

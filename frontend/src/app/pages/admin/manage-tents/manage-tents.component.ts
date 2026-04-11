@@ -45,7 +45,7 @@ interface AdminTent {
                 <th>Name</th>
                 <th>Type</th>
                 <th>Capacity</th>
-                <th>Reg.</th>
+                <th>Downpayment</th>
                 <th>Arrival</th>
                 <th>Total</th>
                 <th>Status</th>

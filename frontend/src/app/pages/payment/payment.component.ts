@@ -24,7 +24,7 @@ import { ToastService } from '../../core/services/toast.service';
         </div>
         <div class="border-t border-sand pt-4 space-y-2">
           <div class="flex justify-between">
-            <span class="text-muted">Registration Fee (Pay Now)</span>
+            <span class="text-muted">Downpayment (Pay Now)</span>
             <span>{{ booking.registration_amount | currencyInr }}</span>
           </div>
           <div class="flex justify-between">
@@ -32,7 +32,7 @@ import { ToastService } from '../../core/services/toast.service';
             <span>{{ booking.arrival_amount | currencyInr }} (Pay in cash at hotel check-in)</span>
           </div>
           <div class="text-xs text-muted">
-            Registration fee is non-refundable.
+            Downpayment is non-refundable.
           </div>
           <div class="flex justify-between font-semibold text-earth text-base pt-2">
             <span>Total Booking Amount</span>
