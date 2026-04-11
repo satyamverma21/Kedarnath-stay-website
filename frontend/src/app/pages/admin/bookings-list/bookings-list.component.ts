@@ -134,18 +134,18 @@ interface AdminHotel {
 
       <div *ngIf="bookings.length" class="card p-3 sm:p-4">
         <div class="overflow-x-auto">
-          <table>
+          <table class="min-w-[1200px]">
             <thead>
               <tr>
-                <th>Reference</th>
-                <th>Guest</th>
-                <th>Contact Number (Booking)</th>
-                <th>Stay</th>
-                <th *ngIf="!isHotelAdmin">Downpayment Received</th>
-                <th>Due On Arrival</th>
-                <th>Booking Status</th>
-                <th>{{ isHotelAdmin ? 'Cash Payment' : 'Payment' }}</th>
-                <th *ngIf="!isHotelAdmin">Actions</th>
+                <th class="w-[140px]">Reference</th>
+                <th class="w-[150px]">Guest</th>
+                <th class="w-[170px]">Contact Number (Booking)</th>
+                <th class="w-[320px]">Stay</th>
+                <th *ngIf="!isHotelAdmin" class="w-[150px]">Downpayment Received</th>
+                <th class="w-[140px]">Due On Arrival</th>
+                <th class="w-[130px]">Booking Status</th>
+                <th class="w-[220px]">{{ isHotelAdmin ? 'Cash Payment' : 'Payment' }}</th>
+                <th *ngIf="!isHotelAdmin" class="w-[180px]">Actions</th>
               </tr>
             </thead>
 
@@ -158,10 +158,10 @@ interface AdminHotel {
                 <td>
                   <div class="font-medium">{{ b.guest_name || '-' }}</div>
                 </td>
-                <td>{{ b.guest_phone || '-' }}</td>
-                <td>
+                <td class="whitespace-nowrap">{{ b.guest_phone || '-' }}</td>
+                <td class="min-w-[320px]">
                   <div class="font-medium">{{ b.property_name || '-' }} <span class="admin-subtext">({{ b.property_type }})</span></div>
-                  <div class="admin-subtext">{{ formatDateRange(b.check_in, b.check_out) }}</div>
+                  <div class="admin-subtext whitespace-nowrap">{{ formatDateRange(b.check_in, b.check_out) }}</div>
                 </td>
                 <td *ngIf="!isHotelAdmin">
                   <div class="font-semibold">{{ downpaymentReceived(b) | currencyInr }}</div>
