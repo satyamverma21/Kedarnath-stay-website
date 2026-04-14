@@ -15,11 +15,10 @@ import { environment } from '../../../environments/environment';
       <div class="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-10 lg:gap-14 items-center">
         <div class="order-2 md:order-1">
           <h1 class="font-heading text-3xl sm:text-4xl md:text-5xl text-dark mb-4 leading-tight">
-            Boutique rooms & luxury tents in the wild.
+            केदारनाथ मंदिर के पास लक्ज़री रूम, फैमिली रूम एवं टेंट बुकिंग की सुविधा उपलब्ध है।
           </h1>
           <p class="text-muted text-base sm:text-lg mb-6 max-w-lg">
-            Discover serene stays surrounded by forest, stars and silence. Handpicked rooms and
-            glamping tents for couples, families and groups.
+            पवित्र केदारनाथ मंदिर के दिव्य दर्शन के साथ तारों भरे आसमान और सुकून भरे माहौल के बीच शांतिपूर्ण ठहराव का अनुभव करें। कपल्स, परिवारों और समूहों के लिए चुने हुए लक्ज़री कमरे और ग्लैम्पिंग टेंट उपलब्ध हैं।
           </p>
           <div class="flex flex-wrap gap-3">
             <button class="btn-primary" routerLink="/rooms">Search Rooms</button>

@@ -15,7 +15,7 @@ import { Component } from '@angular/core';
         </div>
         <div class="mt-8 pt-8 border-t border-white/10 flex flex-col sm:flex-row sm:justify-between gap-4 text-cream/70 text-sm">
           <p>&copy; {{ year }} Kedar-Stays. All rights reserved.</p>
-          <p>Crafted with care for boutique stays in the wild.</p>
+          <p>Crafted with care for beautiful stays in the wild.</p>
         </div>
       </div>
     </footer>

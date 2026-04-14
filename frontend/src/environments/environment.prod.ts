@@ -1,5 +1,5 @@
 export const environment = {
-  apiUrl: 'http://192.168.0.104:3000/api',
+  apiUrl: 'http://172.20.10.2:3000/api',
   yatraRegistrationUrl: 'https://registrationandtouristcare.uk.gov.in/',
   helplineNumbers: [
     { label: 'Tourist Helpline', number: '7906266244' },

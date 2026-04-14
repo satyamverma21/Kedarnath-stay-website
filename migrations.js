@@ -260,9 +260,18 @@ function runMigrations() {
 }
 
 function seedInitialData(db) {
-  // Keep only admin seeding; avoid pre-seeding other records.
-  const hotelRow = db.prepare('SELECT id FROM hotels ORDER BY id LIMIT 1').get();
-  const defaultHotelId = hotelRow ? hotelRow.id : null;
+  // Ensure at least one hotel exists so we can attach the initial admin
+  let defaultHotelId = null;
+  const hotelCount = db.prepare('SELECT COUNT(*) as count FROM hotels').get().count;
+  if (hotelCount === 0) {
+    const info = db
+      .prepare('INSERT INTO hotels (name, city, status) VALUES (?, ?, ?)')
+      .run('Main Hotel', null, 'active');
+    defaultHotelId = info.lastInsertRowid;
+  } else {
+    const row = db.prepare('SELECT id FROM hotels ORDER BY id LIMIT 1').get();
+    defaultHotelId = row ? row.id : null;
+  }
 
   const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
   if (userCount === 0) {
@@ -271,6 +280,100 @@ function seedInitialData(db) {
     db.prepare(
       'INSERT INTO users (name, email, phone, password_hash, role, hotel_id) VALUES (?, ?, ?, ?, ?, ?)'
     ).run('Admin', 'admin@admin.com','9999999999', passwordHash, 'admin', defaultHotelId);
+  }
+
+  const roomCount = db.prepare('SELECT COUNT(*) as count FROM rooms').get().count;
+  if (roomCount === 0) {
+    const insertRoom = db.prepare(
+      `INSERT INTO rooms (
+        name, type, description, capacity, basePrice,
+        registrationAmount, arrivalAmount, totalPrice, amenities, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+
+    insertRoom.run(
+      'Forest View Standard Room',
+      'standard',
+      'Cozy room with forest view and all basic amenities.',
+      2,
+      2500,
+      1500,
+      1000,
+      2500,
+      JSON.stringify(['Free WiFi', 'Breakfast Included', 'Air Conditioning']),
+      'active'
+    );
+    insertRoom.run(
+      'Lakefront Deluxe Room',
+      'deluxe',
+      'Spacious room facing the lake with balcony.',
+      3,
+      4000,
+      2400,
+      1600,
+      4000,
+      JSON.stringify(['Free WiFi', 'Lake View', 'Balcony', 'King Bed']),
+      'active'
+    );
+    insertRoom.run(
+      'Family Suite',
+      'family',
+      'Two-bedroom suite ideal for families.',
+      5,
+      6000,
+      3600,
+      2400,
+      6000,
+      JSON.stringify(['Living Area', 'Two Bedrooms', 'Mini Fridge']),
+      'active'
+    );
+  }
+
+  const tentCount = db.prepare('SELECT COUNT(*) as count FROM tents').get().count;
+  if (tentCount === 0) {
+    const insertTent = db.prepare(
+      `INSERT INTO tents (
+        name, type, description, capacity, basePrice,
+        registrationAmount, arrivalAmount, totalPrice, amenities, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+
+    insertTent.run(
+      'Standard Camp Tent',
+      'standard',
+      'Comfortable camping tent with basic facilities.',
+      2,
+      1800,
+      1000,
+      800,
+      1800,
+      JSON.stringify(['Shared Bonfire', 'Sleeping Bags']),
+      'active'
+    );
+    insertTent.run(
+      'Luxury Safari Tent',
+      'luxury',
+      'Luxury safari tent with attached washroom.',
+      3,
+      3500,
+      2000,
+      1500,
+      3500,
+      JSON.stringify(['Attached Washroom', 'Private Bonfire', 'Breakfast']),
+      'active'
+    );
+    insertTent.run(
+      'Honeymoon Glamping Tent',
+      'honeymoon',
+      'Romantic glamping tent with decor and amenities.',
+      2,
+      5000,
+      3000,
+      2000,
+      5000,
+      JSON.stringify(['Decor Lighting', 'Private Bonfire', 'Candle Light Dinner']),
+      'active'
+    );
   }
 }
 
