@@ -23,6 +23,60 @@ function isValidDateString(value) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function assignRoomUnitLabels(entries, roomQuantity) {
+  const maxUnits = Math.max(Number(roomQuantity || 1), 1);
+  const sorted = [...entries].sort((a, b) => {
+    const aKey = `${a.check_in}|${a.check_out}|${a.created_at || ''}|${a.booking_ref || ''}`;
+    const bKey = `${b.check_in}|${b.check_out}|${b.created_at || ''}|${b.booking_ref || ''}`;
+    return aKey.localeCompare(bKey);
+  });
+
+  const slotEnds = Array.from({ length: maxUnits }, () => '');
+  sorted.forEach((entry) => {
+    const requiredUnitsRaw =
+      entry.source_type === 'manual'
+        ? Number(entry.manual_booked_quantity || 0)
+        : Number(entry.status === 'cancelled' ? 0 : 1);
+    const requiredUnits = Math.max(Math.min(requiredUnitsRaw, maxUnits), 0);
+    if (requiredUnits <= 0) {
+      entry.room_unit_ids = [];
+      entry.room_unit_label = '-';
+      return;
+    }
+
+    const availableSlots = [];
+    for (let i = 0; i < maxUnits; i += 1) {
+      if (!slotEnds[i] || String(slotEnds[i]) <= String(entry.check_in)) {
+        availableSlots.push(i + 1);
+      }
+    }
+
+    const assigned = availableSlots.slice(0, requiredUnits);
+
+    assigned.forEach((slotId) => {
+      slotEnds[slotId - 1] = entry.check_out;
+    });
+    entry.room_unit_ids = assigned;
+    entry.room_unit_label =
+      assigned.length === requiredUnits
+        ? assigned.join(', ')
+        : `${assigned.join(', ') || '-'} (overbooked)`;
+  });
+}
+
+function getScopedRoomById(db, user, roomId) {
+  const room = db
+    .prepare('SELECT id, name, quantity, hotel_id FROM rooms WHERE id = ?')
+    .get(roomId);
+  if (!room) {
+    return null;
+  }
+  if (user.role === 'hotel-admin' && Number(user.hotelId || 0) !== Number(room.hotel_id || 0)) {
+    return null;
+  }
+  return room;
+}
+
 function getBookingHotelId(db, booking) {
   if (!booking || !booking.property_type || !booking.property_id) {
     return null;
@@ -588,13 +642,23 @@ async function listInventory(req, res) {
        FROM bookings
        WHERE property_type = 'room'
          AND property_id = ?
-         AND status != 'cancelled'
+          AND status != 'cancelled'
+          AND NOT (date(check_out) <= date(?) OR date(check_in) >= date(?))`
+    );
+    const manualOverlapStmt = db.prepare(
+      `SELECT IFNULL(SUM(booked_quantity), 0) as c
+       FROM room_manual_bookings
+       WHERE room_id = ?
          AND NOT (date(check_out) <= date(?) OR date(check_in) >= date(?))`
     );
 
     const rows = rooms.map((room) => {
       const registeredQuantity = Math.max(Number(room.quantity || 1), 1);
-      const rawBookedQuantity = Number(overlapStmt.get(room.id, requestedFrom, requestedTo).c || 0);
+      const actualBookedQuantity = Number(overlapStmt.get(room.id, requestedFrom, requestedTo).c || 0);
+      const manualBookedQuantity = Number(
+        manualOverlapStmt.get(room.id, requestedFrom, requestedTo).c || 0
+      );
+      const rawBookedQuantity = actualBookedQuantity + manualBookedQuantity;
       const bookedQuantity = Math.min(rawBookedQuantity, registeredQuantity);
       const availableQuantity = Math.max(registeredQuantity - bookedQuantity, 0);
       const occupancyPercent = registeredQuantity
@@ -610,6 +674,8 @@ async function listInventory(req, res) {
         hotel_id: room.hotel_id,
         hotel_name: room.hotel_name || 'Unassigned',
         registered_quantity: registeredQuantity,
+        actual_booked_quantity: actualBookedQuantity,
+        manual_booked_quantity: manualBookedQuantity,
         booked_quantity: bookedQuantity,
         available_quantity: availableQuantity,
         occupancy_percent: occupancyPercent,
@@ -670,6 +736,230 @@ async function listInventory(req, res) {
     });
   } catch (err) {
     console.error('Admin inventory error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+async function createManualRoomBooking(req, res) {
+  try {
+    const { roomId, from, to, bookedQuantity, notes } = req.body || {};
+    const parsedRoomId = Number(roomId);
+    const parsedBookedQuantity = Number(bookedQuantity);
+
+    if (!Number.isInteger(parsedRoomId) || parsedRoomId <= 0) {
+      return res.status(400).json({ message: 'Valid roomId is required' });
+    }
+    if (!isValidDateString(from) || !isValidDateString(to) || String(to) <= String(from)) {
+      return res.status(400).json({ message: 'Valid date range is required and `to` must be after `from`' });
+    }
+    if (!Number.isInteger(parsedBookedQuantity) || parsedBookedQuantity < 0) {
+      return res.status(400).json({ message: 'bookedQuantity must be a whole number (0 or more)' });
+    }
+
+    const db = getDb();
+    const room = getScopedRoomById(db, req.user, parsedRoomId);
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found or access denied' });
+    }
+
+    const roomQuantity = Math.max(Number(room.quantity || 1), 1);
+    if (parsedBookedQuantity > roomQuantity) {
+      return res
+        .status(400)
+        .json({ message: `bookedQuantity cannot exceed room quantity (${roomQuantity})` });
+    }
+
+    if (parsedBookedQuantity === 0) {
+      db.prepare(
+        `DELETE FROM room_manual_bookings
+         WHERE room_id = ? AND check_in = ? AND check_out = ?`
+      ).run(parsedRoomId, from, to);
+      return res.json({
+        success: true,
+        removed: true,
+        room_id: parsedRoomId,
+        check_in: from,
+        check_out: to
+      });
+    }
+
+    const normalizedNotes = typeof notes === 'string' ? notes.trim().slice(0, 500) : null;
+    db.prepare(
+      `INSERT INTO room_manual_bookings (room_id, check_in, check_out, booked_quantity, notes, created_by_user_id)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(room_id, check_in, check_out)
+       DO UPDATE SET
+         booked_quantity = excluded.booked_quantity,
+         notes = excluded.notes,
+         created_by_user_id = excluded.created_by_user_id`
+    ).run(parsedRoomId, from, to, parsedBookedQuantity, normalizedNotes || null, req.user.id);
+
+    const saved = db
+      .prepare(
+        `SELECT id, room_id, check_in, check_out, booked_quantity, notes, created_by_user_id, created_at
+         FROM room_manual_bookings
+         WHERE room_id = ? AND check_in = ? AND check_out = ?`
+      )
+      .get(parsedRoomId, from, to);
+
+    return res.status(201).json(saved);
+  } catch (err) {
+    console.error('Create manual room booking error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+async function deleteManualRoomBooking(req, res) {
+  try {
+    const manualBookingId = Number(req.params.id);
+    if (!Number.isInteger(manualBookingId) || manualBookingId <= 0) {
+      return res.status(400).json({ message: 'Valid manual booking id is required' });
+    }
+
+    const db = getDb();
+    const existing = db
+      .prepare(
+        `SELECT mb.id, mb.room_id, mb.check_in, mb.check_out, mb.booked_quantity, r.hotel_id
+         FROM room_manual_bookings mb
+         JOIN rooms r ON r.id = mb.room_id
+         WHERE mb.id = ?`
+      )
+      .get(manualBookingId);
+    if (!existing) {
+      return res.status(404).json({ message: 'Manual booking not found' });
+    }
+
+    if (req.user.role === 'hotel-admin') {
+      if (!req.user.hotelId || Number(existing.hotel_id || 0) !== Number(req.user.hotelId)) {
+        return res.status(403).json({ message: 'Not allowed to cancel manual bookings of another hotel' });
+      }
+    }
+
+    db.prepare('DELETE FROM room_manual_bookings WHERE id = ?').run(manualBookingId);
+    return res.json({ success: true, removed: true, id: manualBookingId });
+  } catch (err) {
+    console.error('Delete manual room booking error', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+async function listRoomBookings(req, res) {
+  try {
+    const roomId = Number(req.params.roomId);
+    if (!Number.isInteger(roomId) || roomId <= 0) {
+      return res.status(400).json({ message: 'Valid roomId is required' });
+    }
+
+    const db = getDb();
+    const room = db
+      .prepare(
+        `SELECT r.id, r.name, r.type, r.quantity, r.hotel_id, COALESCE(h.name, 'Unassigned') as hotel_name
+         FROM rooms r
+         LEFT JOIN hotels h ON h.id = r.hotel_id
+         WHERE r.id = ?`
+      )
+      .get(roomId);
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' });
+    }
+
+    if (req.user.role === 'hotel-admin') {
+      if (!req.user.hotelId || Number(room.hotel_id || 0) !== Number(req.user.hotelId)) {
+        return res.status(403).json({ message: 'Not allowed to view bookings of another hotel room' });
+      }
+    }
+
+    const bookingRows = db
+      .prepare(
+        `SELECT b.id,
+                b.booking_ref,
+                b.check_in,
+                b.check_out,
+                b.status,
+                b.payment_status,
+                b.registration_amount,
+                b.arrival_amount,
+                b.total_amount,
+                b.created_at,
+                u.name as guest_name,
+                u.phone as guest_phone
+         FROM bookings b
+         LEFT JOIN users u ON u.id = b.user_id
+         WHERE b.property_type = 'room'
+           AND b.property_id = ?
+         ORDER BY date(b.check_in) DESC, b.id DESC`
+       )
+       .all(roomId);
+
+    const manualRows = db
+      .prepare(
+        `SELECT mb.id,
+                mb.check_in,
+                mb.check_out,
+                mb.booked_quantity,
+                mb.created_at
+         FROM room_manual_bookings mb
+         WHERE mb.room_id = ?
+         ORDER BY date(mb.check_in) DESC, mb.id DESC`
+      )
+      .all(roomId)
+      .map((manual) => ({
+        id: -Number(manual.id), // keep numeric id while avoiding clashes with real bookings
+        manual_booking_id: Number(manual.id),
+        source_type: 'manual',
+        booking_ref: `MANUAL-${manual.id}`,
+        check_in: manual.check_in,
+        check_out: manual.check_out,
+        status: 'manual',
+        payment_status: null,
+        registration_amount: 0,
+        arrival_amount: 0,
+        total_amount: 0,
+        created_at: manual.created_at,
+        guest_name: 'SELF',
+        guest_phone: null,
+        manual_booked_quantity: Number(manual.booked_quantity || 0)
+      }));
+
+    const rows = [
+      ...bookingRows.map((booking) => ({
+        ...booking,
+        source_type: 'booking',
+        manual_booking_id: null,
+        manual_booked_quantity: 0
+      })),
+      ...manualRows
+    ];
+    assignRoomUnitLabels(rows, room.quantity);
+
+    const today = getTodayDateString();
+    const currentAndUpcoming = [];
+    const past = [];
+    rows.forEach((booking) => {
+      if (String(booking.check_out) > today) {
+        currentAndUpcoming.push(booking);
+      } else {
+        past.push(booking);
+      }
+    });
+
+    currentAndUpcoming.sort((a, b) => String(a.check_in).localeCompare(String(b.check_in)));
+    past.sort((a, b) => String(b.check_in).localeCompare(String(a.check_in)));
+
+    return res.json({
+      room: {
+        id: room.id,
+        name: room.name,
+        type: room.type,
+        quantity: Number(room.quantity || 1),
+        hotel_id: room.hotel_id,
+        hotel_name: room.hotel_name
+      },
+      currentAndUpcoming,
+      past
+    });
+  } catch (err) {
+    console.error('Admin list room bookings error', err);
     return res.status(500).json({ message: 'Internal server error' });
   }
 }
@@ -1358,6 +1648,9 @@ async function updateBookingStatus(req, res) {
       if (!req.user.hotelId || Number(bookingHotelId) !== Number(req.user.hotelId)) {
         return res.status(403).json({ message: 'Not allowed to modify bookings of another hotel' });
       }
+      if (status !== 'cancelled') {
+        return res.status(403).json({ message: 'Hotel admin can only cancel bookings' });
+      }
     }
     db.prepare('UPDATE bookings SET status = ? WHERE id = ?').run(status, id);
     const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id);
@@ -1599,6 +1892,9 @@ module.exports = {
   getDashboard,
   listRooms,
   listInventory,
+  listRoomBookings,
+  createManualRoomBooking,
+  deleteManualRoomBooking,
   createRoom,
   updateRoom,
   deleteRoom,

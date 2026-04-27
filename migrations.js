@@ -87,6 +87,18 @@ function runMigrations() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS room_manual_bookings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+      check_in DATE NOT NULL,
+      check_out DATE NOT NULL,
+      booked_quantity INTEGER NOT NULL DEFAULT 1,
+      notes TEXT,
+      created_by_user_id INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(room_id, check_in, check_out)
+    );
+
     CREATE TABLE IF NOT EXISTS payments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       booking_id INTEGER REFERENCES bookings(id),
@@ -253,7 +265,12 @@ function runMigrations() {
          arrival_amount = CASE
            WHEN arrival_amount >= 0 THEN arrival_amount
            ELSE 0
-         END`
+          END`
+  );
+
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_room_manual_bookings_room_dates
+     ON room_manual_bookings (room_id, check_in, check_out);`
   );
 
   seedInitialData(db);

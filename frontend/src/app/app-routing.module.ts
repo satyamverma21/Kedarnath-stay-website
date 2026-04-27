@@ -31,6 +31,7 @@ import { ManageUsersComponent } from './pages/admin/manage-users/manage-users.co
 import { UserFormComponent } from './pages/admin/user-form/user-form.component';
 import { PromoCodeMasterComponent } from './pages/admin/promo-code-master/promo-code-master.component';
 import { InventoryComponent } from './pages/admin/inventory/inventory.component';
+import { RoomBookingsComponent } from './pages/admin/room-bookings/room-bookings.component';
 
 const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -73,6 +74,7 @@ const routes: Routes = [
       { path: 'users/:id/edit', component: UserFormComponent },
       { path: 'rooms', component: ManageRoomsComponent },
       { path: 'inventory', component: InventoryComponent },
+      { path: 'inventory/rooms/:roomId/bookings', component: RoomBookingsComponent },
       { path: 'rooms/new', component: RoomFormComponent },
       { path: 'rooms/:id/edit', component: RoomFormComponent },
       { path: 'tents', component: ManageTentsComponent },

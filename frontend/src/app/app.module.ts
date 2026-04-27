@@ -42,6 +42,7 @@ import { HotelFormComponent } from './pages/admin/hotel-form/hotel-form.componen
 import { ManageHotelsComponent } from './pages/admin/manage-hotels/manage-hotels.component';
 import { PromoCodeMasterComponent } from './pages/admin/promo-code-master/promo-code-master.component';
 import { InventoryComponent } from './pages/admin/inventory/inventory.component';
+import { RoomBookingsComponent } from './pages/admin/room-bookings/room-bookings.component';
 
 @NgModule({
   declarations: [
@@ -66,6 +67,7 @@ import { InventoryComponent } from './pages/admin/inventory/inventory.component'
     NavbarPrototypeComponent,
     PromoCodeMasterComponent,
     InventoryComponent,
+    RoomBookingsComponent,
     LoginComponent,
     RegisterComponent,
     AdminLayoutComponent,

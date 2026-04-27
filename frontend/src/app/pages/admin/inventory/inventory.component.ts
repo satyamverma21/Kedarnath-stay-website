@@ -7,6 +7,8 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
 import { CurrencyInrPipe } from '../../../shared/pipes/currency-inr.pipe';
 import { environment } from '../../../../environments/environment';
 import { AuthService } from '../../../core/services/auth.service';
+import { ToastService } from '../../../core/services/toast.service';
+import { RouterLink } from '@angular/router';
 
 interface AdminHotel {
   id: number;
@@ -22,6 +24,8 @@ interface InventoryRow {
   hotel_id: number | null;
   hotel_name: string;
   registered_quantity: number;
+  actual_booked_quantity?: number;
+  manual_booked_quantity?: number;
   booked_quantity: number;
   available_quantity: number;
   occupancy_percent: number;
@@ -133,6 +137,58 @@ interface InventoryResponse {
         </div>
       </div>
 
+      <div class="card p-4 sm:p-5 text-sm">
+        <h2 class="font-semibold text-sm uppercase tracking-widest mb-3">Manual Room Booking</h2>
+        <p class="text-muted text-xs mb-3">
+          Mark a room as manually booked for a date range. Use quantity 0 to remove an existing manual block for the same room and dates.
+        </p>
+
+        <div class="grid md:grid-cols-5 gap-3 items-end">
+          <div class="md:col-span-2">
+            <label class="block text-xs uppercase mb-1 tracking-widest text-muted">Room</label>
+            <select [(ngModel)]="manualBooking.roomId" class="w-full" [disabled]="!rows.length || loading || savingManualBooking">
+              <option value="" disabled>Select room</option>
+              <option *ngFor="let row of rows" [value]="row.room_id">
+                {{ row.room_name }} ({{ row.hotel_name }})
+              </option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs uppercase mb-1 tracking-widest text-muted">From</label>
+            <input type="date" [(ngModel)]="manualBooking.from" class="w-full" />
+          </div>
+          <div>
+            <label class="block text-xs uppercase mb-1 tracking-widest text-muted">To</label>
+            <input type="date" [(ngModel)]="manualBooking.to" class="w-full" />
+          </div>
+          <div>
+            <label class="block text-xs uppercase mb-1 tracking-widest text-muted">Booked Qty</label>
+            <input type="number" min="0" class="w-full" [(ngModel)]="manualBooking.bookedQuantity" />
+          </div>
+        </div>
+
+        <div class="mt-3 grid md:grid-cols-[1fr,auto] gap-3 items-end">
+          <div>
+            <label class="block text-xs uppercase mb-1 tracking-widest text-muted">Notes (Optional)</label>
+            <input
+              type="text"
+              [(ngModel)]="manualBooking.notes"
+              class="w-full"
+              maxlength="500"
+              placeholder="e.g. corporate hold, maintenance, internal booking"
+            />
+          </div>
+          <button
+            class="btn-primary text-xs h-10"
+            (click)="saveManualBooking()"
+            [disabled]="loading || savingManualBooking || !rows.length"
+            [class.btn-loading]="savingManualBooking"
+          >
+            Save Manual Booking
+          </button>
+        </div>
+      </div>
+
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="card p-4">
           <div class="text-xs uppercase tracking-widest text-muted">Room Types</div>
@@ -203,6 +259,7 @@ interface InventoryResponse {
                 <th>Status</th>
                 <th>Capacity</th>
                 <th>Registered</th>
+                <th>Manual</th>
                 <th>Booked</th>
                 <th>Available</th>
                 <th>Occupancy</th>
@@ -212,7 +269,11 @@ interface InventoryResponse {
             <tbody>
               <tr *ngFor="let row of rows">
                 <td *ngIf="!isHotelAdmin">{{ row.hotel_name }}</td>
-                <td class="font-medium">{{ row.room_name }}</td>
+                <td class="font-medium">
+                  <a [routerLink]="['/admin/inventory/rooms', row.room_id, 'bookings']" class="text-blue-600 hover:underline">
+                    {{ row.room_name }}
+                  </a>
+                </td>
                 <td>{{ row.room_type }}</td>
                 <td>
                   <span class="status-pill" [ngClass]="row.room_status === 'active' ? 'confirmed' : 'cancelled'">
@@ -221,6 +282,7 @@ interface InventoryResponse {
                 </td>
                 <td>{{ row.capacity }}</td>
                 <td>{{ row.registered_quantity }}</td>
+                <td>{{ row.manual_booked_quantity || 0 }}</td>
                 <td>{{ row.booked_quantity }}</td>
                 <td>{{ row.available_quantity }}</td>
                 <td>{{ row.occupancy_percent }}%</td>
@@ -237,6 +299,7 @@ export class InventoryComponent {
   hotels: AdminHotel[] = [];
   rows: InventoryRow[] = [];
   loading = false;
+  savingManualBooking = false;
   isHotelAdmin = false;
 
   data: InventoryResponse = {
@@ -262,7 +325,15 @@ export class InventoryComponent {
     search: ''
   };
 
-  constructor(private http: HttpClient, private auth: AuthService) {
+  manualBooking = {
+    roomId: '',
+    from: '',
+    to: '',
+    bookedQuantity: 1,
+    notes: ''
+  };
+
+  constructor(private http: HttpClient, private auth: AuthService, private toast: ToastService) {
     const user = this.auth.getCurrentUser();
     this.isHotelAdmin = user?.role === 'hotel-admin';
     this.resetFilters();
@@ -297,6 +368,9 @@ export class InventoryComponent {
       status: '',
       search: ''
     };
+
+    this.manualBooking.from = today;
+    this.manualBooking.to = tomorrow;
   }
 
   load(): void {
@@ -314,6 +388,10 @@ export class InventoryComponent {
       next: (resp) => {
         this.data = resp;
         this.rows = resp.rows || [];
+        const roomStillVisible = this.rows.some((row) => String(row.room_id) === this.manualBooking.roomId);
+        if (!roomStillVisible) {
+          this.manualBooking.roomId = this.rows.length ? String(this.rows[0].room_id) : '';
+        }
         this.loading = false;
       },
       error: () => {
@@ -323,6 +401,45 @@ export class InventoryComponent {
     });
   }
 
+  saveManualBooking(): void {
+    const roomId = Number(this.manualBooking.roomId);
+    const bookedQuantity = Number(this.manualBooking.bookedQuantity);
+
+    if (!roomId) {
+      this.toast.error('Please select a room.');
+      return;
+    }
+    if (!this.manualBooking.from || !this.manualBooking.to || this.manualBooking.to <= this.manualBooking.from) {
+      this.toast.error('Please choose a valid date range.');
+      return;
+    }
+    if (!Number.isInteger(bookedQuantity) || bookedQuantity < 0) {
+      this.toast.error('Booked quantity must be a whole number.');
+      return;
+    }
+
+    this.savingManualBooking = true;
+    this.http
+      .post(`${environment.apiUrl}/admin/inventory/manual-bookings`, {
+        roomId,
+        from: this.manualBooking.from,
+        to: this.manualBooking.to,
+        bookedQuantity,
+        notes: this.manualBooking.notes?.trim() || null
+      })
+      .subscribe({
+        next: () => {
+          this.savingManualBooking = false;
+          this.toast.success(bookedQuantity === 0 ? 'Manual booking removed.' : 'Manual booking saved.');
+          this.load();
+        },
+        error: (err) => {
+          this.savingManualBooking = false;
+          this.toast.error(err?.error?.message || 'Unable to save manual booking.');
+        }
+      });
+  }
+
   private toYmd(date: Date): string {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -330,4 +447,3 @@ export class InventoryComponent {
     return `${year}-${month}-${day}`;
   }
 }
-
