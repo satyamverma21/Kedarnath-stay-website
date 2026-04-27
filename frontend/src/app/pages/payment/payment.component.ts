@@ -9,161 +9,150 @@ import { ToastService } from '../../core/services/toast.service';
 @Component({
   selector: 'app-payment',
   template: `
-    <section class="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-10" *ngIf="booking">
-      <h1 class="font-heading text-2xl sm:text-3xl text-dark mb-6">Payment</h1>
-      <div class="card p-5 sm:p-6 space-y-4 text-sm">
-        <div>
-          <div class="font-semibold text-dark">Booking {{ booking.booking_ref }}</div>
-          <div class="text-muted mt-1" *ngIf="hotelName">
-            Hotel: {{ hotelName }}
+    <section class="page-section page-section--tight" *ngIf="booking">
+      <div class="page-container booking-journey">
+        <div class="surface-panel surface-panel--feature flow-card">
+          <div>
+            <p class="eyebrow">Payment verification</p>
+            <h1 class="section-title">Complete the downpayment and submit it for review.</h1>
+            <p class="section-copy">
+              The payment step now separates instructions, QR options, app actions, and verification
+              feedback so the process is easier to follow.
+            </p>
           </div>
-          <div class="text-muted mt-1">
-            {{ formatDate(booking.check_in) }} to {{ formatDate(booking.check_out) }} |
-            {{ booking.nights }} nights | {{ booking.guests }} guests
+
+          <div class="price-breakdown">
+            <div class="price-row">
+              <span class="text-muted">Booking reference</span>
+              <strong>{{ booking.booking_ref }}</strong>
+            </div>
+            <div class="price-row" *ngIf="hotelName">
+              <span class="text-muted">Hotel</span>
+              <span>{{ hotelName }}</span>
+            </div>
+            <div class="price-row">
+              <span class="text-muted">Stay dates</span>
+              <span>{{ formatDate(booking.check_in) }} to {{ formatDate(booking.check_out) }}</span>
+            </div>
+            <div class="price-row">
+              <span class="text-muted">Guests and nights</span>
+              <span>{{ booking.guests }} guests · {{ booking.nights }} nights</span>
+            </div>
           </div>
-        </div>
-        <div class="border-t border-sand pt-4 space-y-2">
-          <div class="flex justify-between">
-            <span class="text-muted">Downpayment (Pay Now)</span>
-            <span>{{ booking.registration_amount | currencyInr }}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-muted">Balance Due on Arrival</span>
-            <span>{{ booking.arrival_amount | currencyInr }} (Pay in cash at hotel check-in)</span>
-          </div>
-          <div class="text-xs text-muted">
-            Downpayment is non-refundable.
-          </div>
-          <div class="flex justify-between font-semibold text-earth text-base pt-2">
-            <span>Total Booking Amount</span>
-            <span>{{ booking.total_amount | currencyInr }}</span>
-          </div>
-        </div>
-        <div class="pt-2">
-          <div *ngIf="verificationPending" class="rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-3 py-2 text-sm">
+
+          <div class="feedback-banner feedback-banner--warning" *ngIf="verificationPending">
             {{ successMessage || 'Payment submitted. Verification is pending with admin.' }}
           </div>
-          <div
-            *ngIf="verificationPending && hasAnySupportContact()"
-            class="mt-3 rounded-md border border-sky-300 bg-sky-50 text-sky-900 px-3 py-3 text-sm space-y-2"
-          >
-            <div class="font-semibold">Need help?</div>
-            <div *ngIf="supportContacts.hotelAdminPhone">
-              Hotel contact number:
-              <a class="font-semibold underline" [href]="'tel:' + supportContacts.hotelAdminPhone">
-                {{ supportContacts.hotelAdminPhone }}
-              </a>
-            </div>
-            <div *ngIf="supportContacts.mainAdminPhone">
-              Kedar-stays helpline number:
-              <a class="font-semibold underline" [href]="'tel:' + supportContacts.mainAdminPhone">
-                {{ supportContacts.mainAdminPhone }}
-              </a>
-            </div>
+
+          <div class="feedback-banner feedback-banner--info" *ngIf="verificationPending && hasAnySupportContact()">
+            Need help?
+            <span *ngIf="supportContacts.hotelAdminPhone"> Hotel: {{ supportContacts.hotelAdminPhone }}.</span>
+            <span *ngIf="supportContacts.mainAdminPhone"> Helpline: {{ supportContacts.mainAdminPhone }}.</span>
           </div>
 
-          <div *ngIf="!verificationPending && isDesktop; else mobilePayment" class="space-y-4">
-            <div class="text-sm text-muted">
-              Scan QR from your phone UPI app and complete payment for
-              <span class="font-semibold text-dark">{{ booking.registration_amount | currencyInr }}</span>.
-            </div>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <div class="border border-sand rounded-lg p-3">
-                <div class="font-semibold text-dark mb-2">Paytm</div>
-                <img
-                  [src]="paytmQrPath"
-                  alt="Paytm QR Code"
-                  class="w-full max-w-[220px] mx-auto rounded-md border border-sand"
-                />
-                <div class="mt-2 text-xs text-muted break-all">UPI ID: {{ upiIds.paytm || '-' }}</div>
+          <div *ngIf="!verificationPending" class="section-stack">
+            <div class="price-breakdown">
+              <div class="price-row">
+                <span class="text-muted">Pay now</span>
+                <strong>{{ booking.registration_amount | currencyInr }}</strong>
               </div>
-              <div class="border border-sand rounded-lg p-3">
-                <div class="font-semibold text-dark mb-2">PhonePe</div>
-                <img
-                  [src]="phonepeQrPath"
-                  alt="PhonePe QR Code"
-                  class="w-full max-w-[220px] mx-auto rounded-md border border-sand"
-                />
-                <div class="mt-2 text-xs text-muted break-all">UPI ID: {{ upiIds.phonepe || '-' }}</div>
+              <div class="price-row">
+                <span class="text-muted">Pay on arrival</span>
+                <span>{{ booking.arrival_amount | currencyInr }}</span>
+              </div>
+              <div class="price-row">
+                <span class="text-muted">Booking total</span>
+                <strong>{{ booking.total_amount | currencyInr }}</strong>
               </div>
             </div>
-          </div>
-          <ng-template #mobilePayment>
-            <div class="space-y-4" *ngIf="!verificationPending">
-              <div class="text-sm text-muted">
-                Scan QR from another device, or use app buttons below to complete payment for
-                <span class="font-semibold text-dark">{{ booking.registration_amount | currencyInr }}</span>.
-              </div>
-              <div class="grid gap-4 sm:grid-cols-2">
-                <div class="border border-sand rounded-lg p-3">
-                  <div class="font-semibold text-dark mb-2">Paytm</div>
-                  <img
-                    [src]="paytmQrPath"
-                    alt="Paytm QR Code"
-                    class="w-full max-w-[220px] mx-auto rounded-md border border-sand"
-                  />
-                  <div class="mt-2 text-xs text-muted break-all">UPI ID: {{ upiIds.paytm || '-' }}</div>
-                </div>
-                <div class="border border-sand rounded-lg p-3">
-                  <div class="font-semibold text-dark mb-2">PhonePe</div>
-                  <img
-                    [src]="phonepeQrPath"
-                    alt="PhonePe QR Code"
-                    class="w-full max-w-[220px] mx-auto rounded-md border border-sand"
-                  />
-                  <div class="mt-2 text-xs text-muted break-all">UPI ID: {{ upiIds.phonepe || '-' }}</div>
-                </div>
-              </div>
-            </div>
-            <div class="grid gap-3 sm:grid-cols-2 mt-3" *ngIf="!verificationPending">
-              <button
-                type="button"
-                class="btn-primary text-center"
-                (click)="openPaymentApp('paytm')"
-                [disabled]="!deepLinks.paytm || loading"
-                [class.btn-loading]="loading"
-              >
-                Pay with Paytm ({{ booking.registration_amount | currencyInr }})
-              </button>
-              <button
-                type="button"
-                class="btn-secondary text-center"
-                (click)="openPaymentApp('phonepe')"
-                [disabled]="!deepLinks.phonepe || loading"
-                [class.btn-loading]="loading"
-              >
-                Pay with PhonePe ({{ booking.registration_amount | currencyInr }})
-              </button>
-            </div>
-          </ng-template>
 
-          <div class="mt-3" *ngIf="!verificationPending">
-            <button class="btn-primary w-full" (click)="confirmPayment()" [disabled]="loading" [class.btn-loading]="loading">
-              I Have Completed Payment ({{ booking.registration_amount | currencyInr }})
+            <div class="method-grid">
+              <div class="payment-method">
+                <div class="price-row">
+                  <strong>Paytm</strong>
+                  <span class="pill">QR</span>
+                </div>
+                <div class="payment-qr">
+                  <img [src]="paytmQrPath" alt="Paytm QR Code" />
+                </div>
+                <div class="micro-copy">UPI ID: {{ upiIds.paytm || '-' }}</div>
+                <button type="button" class="btn-secondary" (click)="openPaymentApp('paytm')" [disabled]="!deepLinks.paytm || loading" [class.btn-loading]="loading">
+                  Open Paytm
+                </button>
+              </div>
+
+              <div class="payment-method">
+                <div class="price-row">
+                  <strong>PhonePe</strong>
+                  <span class="pill">QR</span>
+                </div>
+                <div class="payment-qr">
+                  <img [src]="phonepeQrPath" alt="PhonePe QR Code" />
+                </div>
+                <div class="micro-copy">UPI ID: {{ upiIds.phonepe || '-' }}</div>
+                <button type="button" class="btn-secondary" (click)="openPaymentApp('phonepe')" [disabled]="!deepLinks.phonepe || loading" [class.btn-loading]="loading">
+                  Open PhonePe
+                </button>
+              </div>
+            </div>
+
+            <div class="field-stack">
+              <label class="field-label">Transaction ID</label>
+              <input type="text" placeholder="Optional transaction ID for faster verification" [(ngModel)]="transactionId" />
+            </div>
+
+            <div class="micro-copy">
+              If the app link does not open, use the QR code or pay manually with the listed UPI ID.
+            </div>
+
+            <button class="btn-primary" (click)="confirmPayment()" [disabled]="loading" [class.btn-loading]="loading">
+              I Have Completed Payment
             </button>
           </div>
-          <div class="text-xs text-muted mt-2">
-            If app link does not open, copy UPI ID and pay manually:
-            {{ upiIds.paytm }} / {{ upiIds.phonepe }}
-          </div>
-          <div class="mt-2 space-y-2">
-            <input
-              type="text"
-              class="w-full border border-sand rounded-md px-3 py-2"
-              placeholder="Transaction ID (optional)"
-              [(ngModel)]="transactionId"
-            />
-          </div>
-          <div class="text-xs text-red-600 mt-2" *ngIf="error">{{ error }}</div>
 
-          <div *ngIf="showGeneratedCredentials" class="mt-5 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-3 text-sm">
-          <div class="font-semibold text-emerald-900">Your account has been created</div>
-          <div class="text-emerald-900 mt-1">Login ID (Phone): <span class="font-semibold">{{ generatedLoginId }}</span></div>
-          <div class="text-emerald-900 mt-1">Password: <span class="font-semibold">{{ generatedPassword }}</span></div>
-          <div class="text-emerald-900 mt-1"><span class="font-semibold">You are successfully logged in.</span></div>
-          <div class="text-emerald-900 mt-1"><span class="font-semibold" style="color:red">If your payment fails, then click on my bookings menu.</span></div>
+          <div class="field-error" *ngIf="error">{{ error }}</div>
+
+          <div *ngIf="showGeneratedCredentials" class="feedback-banner feedback-banner--success">
+            Account created. Login ID: {{ generatedLoginId }}. Password: {{ generatedPassword }}.
           </div>
         </div>
+
+        <aside class="surface-panel summary-card">
+          <div>
+            <p class="eyebrow">What happens next</p>
+            <h2 class="section-title" style="font-size: 1.8rem;">A simple verification path after payment.</h2>
+          </div>
+
+          <div class="step-list">
+            <div class="step-item">
+              <span class="step-item__index">1</span>
+              <div class="micro-copy">Pay the downpayment with QR or your preferred app.</div>
+            </div>
+            <div class="step-item">
+              <span class="step-item__index">2</span>
+              <div class="micro-copy">Submit the payment so admin can verify it.</div>
+            </div>
+            <div class="step-item">
+              <span class="step-item__index">3</span>
+              <div class="micro-copy">Keep the remaining balance ready for check-in day.</div>
+            </div>
+          </div>
+
+          <div class="price-breakdown">
+            <div class="price-row">
+              <span class="text-muted">Downpayment</span>
+              <strong>{{ booking.registration_amount | currencyInr }}</strong>
+            </div>
+            <div class="price-row">
+              <span class="text-muted">Arrival balance</span>
+              <span>{{ booking.arrival_amount | currencyInr }}</span>
+            </div>
+            <div class="price-row">
+              <span class="text-muted">Status</span>
+              <span>{{ verificationPending ? 'Pending verification' : 'Awaiting payment submission' }}</span>
+            </div>
+          </div>
+        </aside>
       </div>
     </section>
     <app-loading-spinner [show]="loading || !booking"></app-loading-spinner>
@@ -226,12 +215,8 @@ export class PaymentComponent {
   }
 
   private resolveGeneratedCredentials(): void {
-    const stateCredentials =
-      typeof window !== 'undefined' ? window.history.state?.generatedCredentials : null;
-    const storedCredentialsRaw =
-      typeof sessionStorage !== 'undefined'
-        ? sessionStorage.getItem(`generated_credentials_${this.bookingId}`)
-        : null;
+    const stateCredentials = typeof window !== 'undefined' ? window.history.state?.generatedCredentials : null;
+    const storedCredentialsRaw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(`generated_credentials_${this.bookingId}`) : null;
 
     let storedCredentials: { loginId?: string; password?: string } | null = null;
     if (storedCredentialsRaw) {
@@ -252,9 +237,7 @@ export class PaymentComponent {
 
   private loadBooking(): void {
     this.loading = true;
-    const request = this.guestPhone
-      ? this.bookingService.getGuestBooking(this.bookingId, this.guestPhone)
-      : this.bookingService.getBooking(this.bookingId);
+    const request = this.guestPhone ? this.bookingService.getGuestBooking(this.bookingId, this.guestPhone) : this.bookingService.getBooking(this.bookingId);
 
     request.subscribe({
       next: (booking) => {
@@ -292,14 +275,8 @@ export class PaymentComponent {
         this.deepLinks = order.deepLinks;
         this.upiLinks = order.upiLinks || { paytm: '', phonepe: '' };
         this.upiIds = {
-          paytm:
-            (order.upiIds?.paytm || '').trim() ||
-            this.extractUpiId(order.deepLinks.paytm) ||
-            this.extractUpiId(order.upiLinks?.paytm),
-          phonepe:
-            (order.upiIds?.phonepe || '').trim() ||
-            this.extractUpiId(order.deepLinks.phonepe) ||
-            this.extractUpiId(order.upiLinks?.phonepe)
+          paytm: (order.upiIds?.paytm || '').trim() || this.extractUpiId(order.deepLinks.paytm) || this.extractUpiId(order.upiLinks?.paytm),
+          phonepe: (order.upiIds?.phonepe || '').trim() || this.extractUpiId(order.deepLinks.phonepe) || this.extractUpiId(order.upiLinks?.phonepe)
         };
         this.loading = false;
       },
@@ -316,10 +293,7 @@ export class PaymentComponent {
       return;
     }
 
-    const request =
-      this.booking.property_type === 'room'
-        ? this.roomService.getRoom(this.booking.property_id)
-        : this.tentService.getTent(this.booking.property_id);
+    const request = this.booking.property_type === 'room' ? this.roomService.getRoom(this.booking.property_id) : this.tentService.getTent(this.booking.property_id);
 
     request.subscribe({
       next: (property) => {
@@ -380,8 +354,7 @@ export class PaymentComponent {
             };
           }
           this.verificationPending = true;
-          this.successMessage =
-            resp?.message || 'Payment submitted. Verification is pending with admin.';
+          this.successMessage = resp?.message || 'Payment submitted. Verification is pending with admin.';
           this.toast.success(this.successMessage);
         },
         error: (err) => {

@@ -19,22 +19,30 @@ import { environment } from '../environments/environment';
   selector: 'app-root',
 
   template: `
-    <div class="min-h-screen flex flex-col">
+    <div class="app-shell">
       <app-navbar></app-navbar>
-      <div *ngIf="!isAdmin" class="site-banner relative">
-        <marquee class="site-banner__marquee" behavior="scroll" direction="left" scrollamount="6">
-          Official Char Dham & Hemkund Sahib Yatra Registration Portal Using Web Portal:
-          <a
-            [href]="yatraRegistrationUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-blue-600 font-semibold hover:underline"
-          >
-            Chardham & Shri Hemkund Sahib Yatra Registration
-          </a>
-        </marquee>
-      </div>
-      <main class="flex-1">
+      <section *ngIf="!isAdmin" class="app-notice">
+        <div class="page-container">
+          <div class="app-notice__inner">
+            <div>
+              <p class="app-notice__title">Pilgrim Registration</p>
+              <p class="app-notice__copy">
+                Complete the official Char Dham and Hemkund Sahib Yatra registration before arrival
+                to keep your journey smooth and hassle-free.
+              </p>
+            </div>
+            <a
+              [href]="yatraRegistrationUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn-secondary"
+            >
+              Open Official Portal
+            </a>
+          </div>
+        </div>
+      </section>
+      <main class="app-main">
         <router-outlet></router-outlet>
       </main>
       <app-toast-container></app-toast-container>

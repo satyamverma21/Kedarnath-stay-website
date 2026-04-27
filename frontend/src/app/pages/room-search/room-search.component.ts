@@ -1,78 +1,85 @@
 import { Component } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { NgForOf, NgIf } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { RoomService, Room } from '../../core/services/room.service';
 import { PropertyCardComponent } from '../../shared/components/property-card/property-card.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 
 @Component({
   selector: 'app-room-search',
- 
   template: `
-    <section class="bg-gradient-to-b from-sand/20 to-cream border-b border-sand/60 py-6 sm:py-8">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6">
-        <h1 class="font-heading text-2xl sm:text-3xl text-dark mb-1">Rooms</h1>
-        <p class="text-muted text-sm sm:text-base">Filter cozy forest rooms for your stay.</p>
-      </div>
-    </section>
+    <section class="page-section page-section--tight">
+      <div class="page-container search-shell">
+        <div class="search-shell__header">
+          <p class="eyebrow">Room collection</p>
+          <h1 class="section-title">Rooms curated for comfort, clarity, and easier decisions.</h1>
+          <p class="section-copy">
+            Filter by price, guest count, and room type to find the right stay without leaving the
+            decision context.
+          </p>
+        </div>
 
-    <section class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 grid md:grid-cols-[280px,1fr] gap-6 lg:gap-8">
-      <aside class="card p-4 sm:p-5 space-y-4 h-fit md:sticky md:top-24">
-        <h2 class="font-semibold text-dark mb-3 text-sm tracking-widest uppercase">Filters</h2>
-        <div>
-          <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Price range (₹)</label>
-          <div class="flex gap-2">
-            <input type="number" placeholder="Min" class="flex-1" [formControl]="filterForm.controls.minPrice" />
-            <input type="number" placeholder="Max" class="flex-1" [formControl]="filterForm.controls.maxPrice" />
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Guests</label>
-          <input type="number" min="1" [formControl]="filterForm.controls.capacity" />
-        </div>
-        <div>
-          <label class="block text-xs uppercase mb-1.5 tracking-widest text-muted">Room type</label>
-          <div class="space-y-2 text-sm mt-2">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" value="standard" (change)="onTypeChange($event)" class="rounded" />
-              <span>Standard</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" value="deluxe" (change)="onTypeChange($event)" class="rounded" />
-              <span>Deluxe</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" value="suite" (change)="onTypeChange($event)" class="rounded" />
-              <span>Suite</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" value="family" (change)="onTypeChange($event)" class="rounded" />
-              <span>Family</span>
-            </label>
-          </div>
-        </div>
-        <button class="btn-primary w-full mt-3" (click)="applyFilters()" [disabled]="loading" [class.btn-loading]="loading">Apply Filters</button>
-      </aside>
+        <div class="search-layout">
+          <aside class="surface-panel search-rail">
+            <div>
+              <p class="field-label">Price range</p>
+              <div class="form-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+                <input type="number" placeholder="Minimum" [formControl]="filterForm.controls.minPrice" />
+                <input type="number" placeholder="Maximum" [formControl]="filterForm.controls.maxPrice" />
+              </div>
+            </div>
 
-      <div class="min-w-0">
-        <app-loading-spinner [show]="loading"></app-loading-spinner>
-        <div *ngIf="!loading && rooms.length === 0" class="card p-8 sm:p-10 text-center text-muted">
-          No rooms match your filters. Try adjusting price or dates.
-        </div>
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6" *ngIf="!loading && rooms.length">
-          <app-property-card
-            *ngFor="let room of rooms"
-            [name]="room.name"
-            [type]="room.type"
-            [hotelName]="room.hotel_name || null"
-            [description]="room.description || null"
-            [capacity]="room.capacity"
-            [price]="room.totalPrice"
-            [amenities]="room.amenities"
-            [images]="room.images"
-            (book)="goToRoom(room.id)"
-          ></app-property-card>
+            <div class="field-stack">
+              <label class="field-label">Guests</label>
+              <input type="number" min="1" [formControl]="filterForm.controls.capacity" />
+            </div>
+
+            <div class="field-stack">
+              <p class="field-label">Room type</p>
+              <div class="check-list">
+                <label class="check-item"><input type="checkbox" value="standard" (change)="onTypeChange($event)" /> <span>Standard</span></label>
+                <label class="check-item"><input type="checkbox" value="deluxe" (change)="onTypeChange($event)" /> <span>Deluxe</span></label>
+                <label class="check-item"><input type="checkbox" value="suite" (change)="onTypeChange($event)" /> <span>Suite</span></label>
+                <label class="check-item"><input type="checkbox" value="family" (change)="onTypeChange($event)" /> <span>Family</span></label>
+              </div>
+            </div>
+
+            <p class="micro-copy">Use filters to narrow the stay style, then compare property details and payment structure.</p>
+            <button class="btn-primary" (click)="applyFilters()" [disabled]="loading" [class.btn-loading]="loading">Apply Filters</button>
+          </aside>
+
+          <div class="search-results">
+            <div class="search-results__header">
+              <div>
+                <p class="field-label">Available options</p>
+                <p class="section-copy">Browse the available rooms and move into details only when one feels right.</p>
+              </div>
+              <div class="pill">{{ rooms.length }} room{{ rooms.length === 1 ? '' : 's' }}</div>
+            </div>
+
+            <app-loading-spinner [show]="loading"></app-loading-spinner>
+
+            <div *ngIf="!loading && rooms.length === 0" class="surface-panel surface-panel--dense">
+              <h3 class="section-title" style="font-size: 1.5rem;">No rooms match your filters.</h3>
+              <p class="section-copy">Adjust price, dates, or guest count to widen the result set.</p>
+            </div>
+
+            <div class="results-grid" *ngIf="!loading && rooms.length">
+              <app-property-card
+                *ngFor="let room of rooms"
+                [name]="room.name"
+                [type]="room.type"
+                [hotelName]="room.hotel_name || null"
+                [description]="room.description || null"
+                [capacity]="room.capacity"
+                [price]="room.totalPrice"
+                [amenities]="room.amenities"
+                [images]="room.images"
+                (book)="goToRoom(room.id)"
+              ></app-property-card>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -120,17 +127,15 @@ export class RoomSearchComponent {
 
   private searchWithDates(checkin: string, checkout: string, guests: number, type?: string): void {
     this.loading = true;
-    this.roomService
-      .searchRooms({ checkin, checkout, guests: Number(guests), type })
-      .subscribe({
-        next: (rooms) => {
-          this.rooms = rooms;
-          this.loading = false;
-        },
-        error: () => {
-          this.loading = false;
-        }
-      });
+    this.roomService.searchRooms({ checkin, checkout, guests: Number(guests), type }).subscribe({
+      next: (rooms) => {
+        this.rooms = rooms;
+        this.loading = false;
+      },
+      error: () => {
+        this.loading = false;
+      }
+    });
   }
 
   onTypeChange(event: Event): void {
@@ -168,4 +173,3 @@ export class RoomSearchComponent {
     this.router.navigate(['/property', 'room', id]);
   }
 }
-

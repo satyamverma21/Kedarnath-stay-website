@@ -3,19 +3,39 @@ import { Component } from '@angular/core';
 @Component({
   selector: 'app-footer',
   template: `
-    <footer class="bg-dark text-cream mt-auto">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-12">
-        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-6 text-sm">
-          <div class="font-heading text-lg text-cream">Kedar-Stays</div>
-          <div class="flex flex-wrap gap-6">
-            <a routerLink="/rooms" class="text-cream/80 hover:text-cream transition-colors">Rooms</a>
-            <a routerLink="/tents" class="text-cream/80 hover:text-cream transition-colors">Tents</a>
-            <a routerLink="/enquiry" class="text-cream/80 hover:text-cream transition-colors">Enquiry</a>
+    <footer class="site-footer">
+      <div class="page-container">
+        <div class="site-footer__panel surface-panel surface-panel--dark">
+          <div class="site-footer__grid">
+            <div>
+              <p class="eyebrow">Kedarnath Booking</p>
+              <h2 class="site-footer__title">Quiet stays shaped for pilgrims, families, and mountain seekers.</h2>
+              <p class="section-copy" style="color: rgba(255, 252, 246, 0.72); max-width: 28rem;">
+                Choose refined rooms and thoughtfully hosted tents close to the Kedarnath route,
+                with a clear booking journey from discovery to confirmation.
+              </p>
+            </div>
+            <div>
+              <p class="app-notice__title" style="color: rgba(255, 252, 246, 0.78);">Explore</p>
+              <div class="site-footer__list">
+                <a routerLink="/rooms">Rooms</a>
+                <a routerLink="/tents">Tents</a>
+                <a routerLink="/about">About</a>
+              </div>
+            </div>
+            <div>
+              <p class="app-notice__title" style="color: rgba(255, 252, 246, 0.78);">Plan</p>
+              <div class="site-footer__list">
+                <a routerLink="/enquiry">Custom enquiry</a>
+                <a routerLink="/my-bookings">My bookings</a>
+                <a routerLink="/login">Guest login</a>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="mt-8 pt-8 border-t border-white/10 flex flex-col sm:flex-row sm:justify-between gap-4 text-cream/70 text-sm">
-          <p>&copy; {{ year }} Kedar-Stays. All rights reserved.</p>
-          <p>Crafted with care for beautiful stays in the wild.</p>
+          <div class="site-footer__meta">
+            <p>&copy; {{ year }} Kedar-Stays. All rights reserved.</p>
+            <p>Designed for a calm, premium Kedarnath journey.</p>
+          </div>
         </div>
       </div>
     </footer>

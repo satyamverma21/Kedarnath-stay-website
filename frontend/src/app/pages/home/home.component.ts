@@ -11,160 +11,214 @@ import { environment } from '../../../environments/environment';
 @Component({
   selector: 'app-home',
   template: `
-    <section class="bg-gradient-to-b from-sand/30 to-cream py-12 sm:py-16 border-b border-sand/60">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-10 lg:gap-14 items-center">
-        <div class="order-2 md:order-1">
-          <h1 class="font-heading text-3xl sm:text-4xl md:text-5xl text-dark mb-4 leading-tight">
-            केदारनाथ मंदिर के पास लक्ज़री रूम, फैमिली रूम एवं टेंट बुकिंग की सुविधा उपलब्ध है।
-          </h1>
-          <p class="text-muted text-base sm:text-lg mb-6 max-w-lg">
-            पवित्र केदारनाथ मंदिर के दिव्य दर्शन के साथ तारों भरे आसमान और सुकून भरे माहौल के बीच शांतिपूर्ण ठहराव का अनुभव करें। कपल्स, परिवारों और समूहों के लिए चुने हुए लक्ज़री कमरे और ग्लैम्पिंग टेंट उपलब्ध हैं।
-          </p>
-          <div class="flex flex-wrap gap-3">
-            <button class="btn-primary" routerLink="/rooms">Search Rooms</button>
-            <button class="btn-gold" routerLink="/tents">Search Tents</button>
-          </div>
-        </div>
-        <div class="card p-5 sm:p-6 order-1 md:order-2">
-          <div class="flex rounded-button overflow-hidden border border-sand/60 mb-4">
-            <button
-              type="button"
-              class="flex-1 py-2.5 text-sm tracking-widest uppercase transition-colors"
-              [class.bg-sand]="searchTab === 'room'"
-              [class.bg-white]="searchTab !== 'room'"
-              (click)="searchTab = 'room'"
-            >
-              Rooms
-            </button>
-            <button
-              type="button"
-              class="flex-1 py-2.5 text-sm tracking-widest uppercase transition-colors"
-              [class.bg-sand]="searchTab === 'tent'"
-              [class.bg-white]="searchTab !== 'tent'"
-              (click)="searchTab = 'tent'"
-            >
-              Tents
-            </button>
-          </div>
-          <form [formGroup]="searchForm" (ngSubmit)="onSearch()" class="space-y-4">
-            <div class="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Check-in</label>
-                <input type="date" formControlName="checkin" class="w-full" />
-                <div class="text-xs text-red-600 mt-1" *ngIf="submitted && searchForm.get('checkin')?.invalid">
-                  Check-in date is required.
-                </div>
+    <section class="hero-immersive">
+      <div class="hero-immersive__media">
+        <img src="assets/image/background.jpeg" alt="Kedarnath mountain stay backdrop" />
+      </div>
+      <div class="hero-immersive__content">
+        <div class="hero-immersive__grid">
+          <div class="hero-immersive__text">
+            <p class="eyebrow">Kedarnath stay design</p>
+            <h1 class="display-title">A smoother, calmer way to book your stay near Kedarnath.</h1>
+            <p class="section-copy">
+              Explore premium rooms and immersive tents with clearer pricing, cleaner decisions,
+              and a booking flow designed for pilgrims, families, and mountain travellers.
+            </p>
+            <div class="hero-immersive__actions">
+              <button class="btn-primary" routerLink="/rooms">Explore Rooms</button>
+              <button class="btn-secondary" routerLink="/tents">Explore Tents</button>
+            </div>
+            <div class="hero-immersive__facts">
+              <div class="hero-fact">
+                <span class="hero-fact__label">Stay range</span>
+                <span class="hero-fact__value">Rooms, suites, family and tent options</span>
               </div>
-              <div>
-                <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Check-out</label>
-                <input type="date" formControlName="checkout" class="w-full" />
-                <div class="text-xs text-red-600 mt-1" *ngIf="submitted && searchForm.get('checkout')?.invalid">
-                  Check-out date is required.
-                </div>
+              <div class="hero-fact">
+                <span class="hero-fact__label">Booking rhythm</span>
+                <span class="hero-fact__value">Search, compare, reserve, verify</span>
+              </div>
+              <div class="hero-fact">
+                <span class="hero-fact__label">Guest promise</span>
+                <span class="hero-fact__value">Clear hierarchy and less friction</span>
               </div>
             </div>
-            <div class="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Guests</label>
-                <input type="number" min="1" formControlName="guests" class="w-full" />
-                <div class="text-xs text-red-600 mt-1" *ngIf="submitted && searchForm.get('guests')?.invalid">
-                  Guests must be at least 1.
+          </div>
+
+          <div class="surface-panel surface-panel--feature booking-orbit">
+            <p class="eyebrow">Plan your stay</p>
+            <div class="booking-tabs">
+              <button
+                type="button"
+                class="pill booking-tabs__button"
+                [class.is-active]="searchTab === 'room'"
+                (click)="searchTab = 'room'"
+              >
+                Rooms
+              </button>
+              <button
+                type="button"
+                class="pill booking-tabs__button"
+                [class.is-active]="searchTab === 'tent'"
+                (click)="searchTab = 'tent'"
+              >
+                Tents
+              </button>
+            </div>
+
+            <form [formGroup]="searchForm" (ngSubmit)="onSearch()" class="form-grid">
+              <div class="form-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+                <div class="field-stack">
+                  <label class="field-label">Check-in</label>
+                  <input type="date" formControlName="checkin" />
+                  <div class="field-error" *ngIf="submitted && searchForm.get('checkin')?.invalid">
+                    Check-in date is required.
+                  </div>
+                </div>
+
+                <div class="field-stack">
+                  <label class="field-label">Check-out</label>
+                  <input type="date" formControlName="checkout" />
+                  <div class="field-error" *ngIf="submitted && searchForm.get('checkout')?.invalid">
+                    Check-out date is required.
+                  </div>
                 </div>
               </div>
-              <div>
-                <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Type</label>
-                <select formControlName="type" class="w-full">
-                  <option value="">Any</option>
-                  <option *ngIf="searchTab === 'room'" value="standard">Standard</option>
-                  <option *ngIf="searchTab === 'room'" value="deluxe">Deluxe</option>
-                  <option *ngIf="searchTab === 'room'" value="suite">Suite</option>
-                  <option *ngIf="searchTab === 'room'" value="family">Family</option>
-                  <option *ngIf="searchTab === 'tent'" value="standard">Standard</option>
-                  <option *ngIf="searchTab === 'tent'" value="luxury">Luxury</option>
-                  <option *ngIf="searchTab === 'tent'" value="safari">Safari</option>
-                  <option *ngIf="searchTab === 'tent'" value="honeymoon">Honeymoon</option>
-                </select>
+
+              <div class="form-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+                <div class="field-stack">
+                  <label class="field-label">Guests</label>
+                  <input type="number" min="1" formControlName="guests" />
+                  <div class="field-error" *ngIf="submitted && searchForm.get('guests')?.invalid">
+                    Guests must be at least 1.
+                  </div>
+                </div>
+
+                <div class="field-stack">
+                  <label class="field-label">Stay type</label>
+                  <select formControlName="type">
+                    <option value="">Any</option>
+                    <option *ngIf="searchTab === 'room'" value="standard">Standard</option>
+                    <option *ngIf="searchTab === 'room'" value="deluxe">Deluxe</option>
+                    <option *ngIf="searchTab === 'room'" value="suite">Suite</option>
+                    <option *ngIf="searchTab === 'room'" value="family">Family</option>
+                    <option *ngIf="searchTab === 'tent'" value="standard">Standard</option>
+                    <option *ngIf="searchTab === 'tent'" value="luxury">Luxury</option>
+                    <option *ngIf="searchTab === 'tent'" value="safari">Safari</option>
+                    <option *ngIf="searchTab === 'tent'" value="honeymoon">Honeymoon</option>
+                  </select>
+                </div>
               </div>
-            </div>
-            <button class="btn-primary w-full mt-1" type="submit">Search Availability</button>
-            <div class="text-xs text-red-600" *ngIf="error">{{ error }}</div>
-          </form>
+
+              <button class="btn-primary" type="submit">Search Availability</button>
+              <div class="field-error" *ngIf="error">{{ error }}</div>
+            </form>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-14">
-      <h2 class="font-heading text-2xl sm:text-3xl text-dark mb-6">Featured Rooms</h2>
-      <app-loading-spinner [show]="loadingRooms"></app-loading-spinner>
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6" *ngIf="!loadingRooms">
-        <app-property-card
-          *ngFor="let room of featuredRooms"
-          [name]="room.name"
-          [type]="room.type"
-          [hotelName]="room.hotel_name || null"
-          [description]="room.description || null"
-          [capacity]="room.capacity"
-          [price]="room.totalPrice"
-          [amenities]="room.amenities"
-          [images]="room.images"
-          (book)="goToProperty('room', room.id)"
-        ></app-property-card>
-      </div>
-    </section>
-
-    <section class="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-      <h2 class="font-heading text-2xl sm:text-3xl text-dark mb-6">Featured Tents</h2>
-      <app-loading-spinner [show]="loadingTents"></app-loading-spinner>
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6" *ngIf="!loadingTents">
-        <app-property-card
-          *ngFor="let tent of featuredTents"
-          [name]="tent.name"
-          [type]="tent.type"
-          [hotelName]="tent.hotel_name || null"
-          [description]="tent.description || null"
-          [capacity]="tent.capacity"
-          [price]="tent.totalPrice"
-          [amenities]="tent.amenities"
-          [images]="tent.images"
-          (book)="goToProperty('tent', tent.id)"
-        ></app-property-card>
-      </div>
-    </section>
-
-    <section class="bg-sand/50 py-12 sm:py-14 mt-12 border-y border-sand/60">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-1">
-          <h3 class="font-heading text-xl text-dark mb-2">Why Choose Us</h3>
-          <p class="text-muted text-sm leading-relaxed">
-            Intimate stays with handcrafted experiences, curated for nature lovers and slow
-            travellers.
-          </p>
-        </div>
-        <div class="card p-4 bg-white/80">
-          <h4 class="font-semibold text-dark mb-1">Thoughtful design</h4>
-          <p class="text-sm text-muted leading-relaxed">
-            Rooms and tents styled with earthy palettes, natural textures and soft lighting.
-          </p>
-        </div>
-        <div class="card p-4 bg-white/80">
-          <h4 class="font-semibold text-dark mb-1">Seamless journeys</h4>
-          <p class="text-sm text-muted leading-relaxed">
-            Instant confirmations, secure payments and clear communication at every step.
-          </p>
+    <section class="page-section page-section--tight">
+      <div class="page-container">
+        <div class="stats-grid">
+          <div class="stat-tile">
+            <span class="stat-tile__value">Clear</span>
+            <span class="stat-tile__label">price split between pay now and arrival balance</span>
+          </div>
+          <div class="stat-tile">
+            <span class="stat-tile__value">Focused</span>
+            <span class="stat-tile__label">layout that prioritizes choices, timing, and next steps</span>
+          </div>
+          <div class="stat-tile">
+            <span class="stat-tile__value">Flexible</span>
+            <span class="stat-tile__label">room and tent journeys for different travel styles</span>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="py-12 sm:py-14">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6">
-        <div class="card flex flex-col md:flex-row items-center justify-between gap-6 p-6 sm:p-8 bg-forest text-cream border-0 shadow-card-hover">
-          <div>
-            <h3 class="font-heading text-xl sm:text-2xl mb-1 text-cream">Planning a group retreat or celebration?</h3>
-            <p class="text-sm text-cream/90 mt-1">
-              Tell us what you have in mind and we will help you design the perfect stay.
+    <section class="page-section page-section--tight">
+      <div class="page-container section-stack">
+        <div>
+          <p class="eyebrow">Featured rooms</p>
+          <h2 class="section-title">Restful rooms for pilgrims, couples, and families.</h2>
+        </div>
+        <app-loading-spinner [show]="loadingRooms"></app-loading-spinner>
+        <div class="results-grid" *ngIf="!loadingRooms">
+          <app-property-card
+            *ngFor="let room of featuredRooms"
+            [name]="room.name"
+            [type]="room.type"
+            [hotelName]="room.hotel_name || null"
+            [description]="room.description || null"
+            [capacity]="room.capacity"
+            [price]="room.totalPrice"
+            [amenities]="room.amenities"
+            [images]="room.images"
+            (book)="goToProperty('room', room.id)"
+          ></app-property-card>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section page-section--tight">
+      <div class="page-container section-stack">
+        <div>
+          <p class="eyebrow">Featured tents</p>
+          <h2 class="section-title">Immersive tent stays with warmth, openness, and mountain atmosphere.</h2>
+        </div>
+        <app-loading-spinner [show]="loadingTents"></app-loading-spinner>
+        <div class="results-grid" *ngIf="!loadingTents">
+          <app-property-card
+            *ngFor="let tent of featuredTents"
+            [name]="tent.name"
+            [type]="tent.type"
+            [hotelName]="tent.hotel_name || null"
+            [description]="tent.description || null"
+            [capacity]="tent.capacity"
+            [price]="tent.totalPrice"
+            [amenities]="tent.amenities"
+            [images]="tent.images"
+            (book)="goToProperty('tent', tent.id)"
+          ></app-property-card>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section">
+      <div class="page-container">
+        <div class="feature-grid">
+          <div class="surface-panel feature-block">
+            <p class="eyebrow">Designed for clarity</p>
+            <h3 class="section-title" style="font-size: 2rem;">A calmer path from search to check-in.</h3>
+            <p class="section-copy">
+              The interface reduces visual noise, keeps decisions grouped together, and gives each
+              section one clear job in the journey.
             </p>
           </div>
-          <button class="btn-gold shrink-0" routerLink="/enquiry">Send an Enquiry</button>
+          <div class="surface-panel feature-block">
+            <h4>Thoughtful hospitality</h4>
+            <p class="text-muted">Property details, amenities, and pricing are surfaced with better balance and scanability.</p>
+          </div>
+          <div class="surface-panel feature-block">
+            <h4>Smoother commitment</h4>
+            <p class="text-muted">Guests see what to pay now, what remains on arrival, and what happens next without digging.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-section page-section--tight">
+      <div class="page-container">
+        <div class="surface-panel surface-panel--dark cta-band">
+          <div>
+            <p class="eyebrow">Custom planning</p>
+            <h3 class="section-title" style="color: var(--color-white);">Planning a group pilgrimage, retreat, or family stay?</h3>
+            <p class="section-copy" style="color: rgba(255, 252, 246, 0.76);">
+              Share your dates, headcount, and room mix. We will help shape a stay plan that fits
+              your journey.
+            </p>
+          </div>
+          <button class="btn-gold" routerLink="/enquiry">Send an Enquiry</button>
         </div>
       </div>
     </section>
@@ -200,7 +254,6 @@ export class HomeComponent {
     this.loadingRooms = true;
     this.roomService.listRooms().subscribe({
       next: (rooms) => {
-        ;
         this.featuredRooms = rooms;
         this.loadingRooms = false;
       },
@@ -212,7 +265,6 @@ export class HomeComponent {
     this.loadingTents = true;
     this.tentService.listTents().subscribe({
       next: (tents) => {
-        ;
         this.featuredTents = tents;
         this.loadingTents = false;
       },
@@ -249,4 +301,3 @@ export class HomeComponent {
     this.router.navigate(['/property', type, id]);
   }
 }
-

@@ -15,12 +15,13 @@ interface NavLink {
   selector: 'app-navbar',
   template: `
     <header class="site-nav">
-      <div class="site-nav__bar max-w-6xl mx-auto px-4 sm:px-6">
+      <div class="page-container">
+        <div class="site-nav__bar">
         <a routerLink="/" class="site-nav__brand" (click)="menuOpen = false">
           <span class="site-nav__brand-mark" aria-hidden="true">KS</span>
           <span>
             <span class="site-nav__brand-title">Kedar-Stays</span>
-            <span class="site-nav__brand-tag">Curated mountain rooms and tents</span>
+            <span class="site-nav__brand-tag">Premium Kedarnath stays</span>
           </span>
         </a>
 
@@ -57,14 +58,14 @@ interface NavLink {
             <span *ngIf="isLoggedIn" class="site-nav__welcome">
               Hi, <span class="font-semibold">{{ userName }}</span>
             </span>
-            <button *ngIf="!isLoggedIn" class="btn-primary text-xs" routerLink="/login">Login</button>
-            <button *ngIf="isLoggedIn" class="btn-gold text-xs" (click)="logout()">Logout</button>
+            <button *ngIf="!isLoggedIn" class="btn-secondary" routerLink="/login">Login</button>
+            <button *ngIf="isLoggedIn" class="btn-primary" (click)="logout()">Logout</button>
           </div>
         </div>
-      </div>
+        </div>
 
-      <div class="site-nav__mobile-panel md:hidden" [class.is-open]="menuOpen" id="mobile-site-nav">
-        <div class="site-nav__mobile-inner px-4 pb-4">
+        <div class="site-nav__mobile-panel md:hidden" [class.is-open]="menuOpen" id="mobile-site-nav">
+        <div class="site-nav__mobile-inner">
           <nav class="site-nav__mobile-links" aria-label="Mobile navigation">
             <a
               *ngFor="let link of visibleLinks"
@@ -84,10 +85,11 @@ interface NavLink {
             <span *ngIf="isLoggedIn" class="site-nav__welcome">
               Signed in as <strong>{{ userName }}</strong>
             </span>
-            <button *ngIf="!isLoggedIn" class="btn-primary text-xs w-full" routerLink="/login" (click)="menuOpen = false">Login</button>
-            <button *ngIf="isLoggedIn" class="btn-gold text-xs w-full" (click)="logout()">Logout</button>
+            <button *ngIf="!isLoggedIn" class="btn-secondary w-full" routerLink="/login" (click)="menuOpen = false">Login</button>
+            <button *ngIf="isLoggedIn" class="btn-primary w-full" (click)="logout()">Logout</button>
           </div>
         </div>
+      </div>
       </div>
     </header>
   `
@@ -144,4 +146,3 @@ export class NavbarComponent {
     window.location.href = '/';
   }
 }
-

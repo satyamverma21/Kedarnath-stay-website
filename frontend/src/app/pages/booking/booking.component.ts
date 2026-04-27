@@ -14,86 +14,99 @@ type PropertyType = 'room' | 'tent';
 @Component({
   selector: 'app-booking',
   template: `
-    <section class="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-      <h1 class="font-heading text-2xl sm:text-3xl text-dark mb-2">Confirm Your Booking</h1>
-      <p class="text-muted text-sm sm:text-base mb-6">
-        Confirm your guest details and continue to payment.
-      </p>
-
-      <div class="grid lg:grid-cols-[1fr,360px] gap-6" *ngIf="property">
-        <form class="card p-5 sm:p-6 space-y-4" [formGroup]="form" (ngSubmit)="confirmAndPay()">
+    <section class="page-section page-section--tight">
+      <div class="page-container booking-journey" *ngIf="property">
+        <form class="surface-panel surface-panel--feature flow-card" [formGroup]="form" (ngSubmit)="confirmAndPay()">
           <div>
-            <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Guest Name</label>
-            <input type="text" formControlName="name" placeholder="Your full name" />
-            <div class="text-xs text-red-600 mt-1" *ngIf="submitted && form.controls.name.invalid">
-              Name is required.
+            <p class="eyebrow">Guest details</p>
+            <h1 class="section-title">Confirm who is travelling and continue to payment.</h1>
+            <p class="section-copy">The flow keeps only the essential inputs here so the next step stays clear and uninterrupted.</p>
+          </div>
+
+          <div class="step-list">
+            <div class="step-item">
+              <span class="step-item__index">1</span>
+              <div>
+                <div class="field-label">Guest name</div>
+                <input type="text" formControlName="name" placeholder="Your full name" />
+                <div class="field-error" *ngIf="submitted && form.controls.name.invalid">Name is required.</div>
+              </div>
+            </div>
+
+            <div class="step-item">
+              <span class="step-item__index">2</span>
+              <div>
+                <div class="field-label">Phone number</div>
+                <input type="tel" formControlName="phone" placeholder="10-digit mobile number" />
+                <div class="field-error" *ngIf="submitted && form.controls.phone.invalid">Enter a valid 10-digit mobile number.</div>
+              </div>
+            </div>
+
+            <div class="step-item">
+              <span class="step-item__index">3</span>
+              <div>
+                <div class="field-label">Email</div>
+                <input type="email" formControlName="email" placeholder="Optional email address" />
+                <div class="field-error" *ngIf="submitted && form.controls.email.invalid">Enter a valid email.</div>
+              </div>
             </div>
           </div>
 
-          <div>
-            <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Phone Number</label>
-            <input type="tel" formControlName="phone" placeholder="10-digit mobile number" />
-            <div class="text-xs text-red-600 mt-1" *ngIf="submitted && form.controls.phone.invalid">
-              Enter a valid 10-digit mobile number.
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs uppercase tracking-widest mb-1.5 text-muted">Email (Optional)</label>
-            <input type="email" formControlName="email" placeholder="you@example.com" />
-            <div class="text-xs text-red-600 mt-1" *ngIf="submitted && form.controls.email.invalid">
-              Enter a valid email.
-            </div>
-          </div>
-
-          <button class="btn-primary w-full mt-2" type="submit" [disabled]="loading" [class.btn-loading]="loading">
-            {{ loading ? 'Processing...' : 'Confirm & Pay' }}
+          <div class="feedback-banner feedback-banner--warning" *ngIf="error">{{ error }}</div>
+          <button class="btn-primary" type="submit" [disabled]="loading" [class.btn-loading]="loading">
+            {{ loading ? 'Processing' : 'Confirm and Pay' }}
           </button>
-          <div class="text-xs text-red-600" *ngIf="error">{{ error }}</div>
         </form>
 
-        <aside class="card p-5 sm:p-6 h-fit">
-          <h2 class="font-semibold text-dark mb-4">Booking Details</h2>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between gap-4" *ngIf="property.hotel_name">
+        <aside class="surface-panel summary-card">
+          <div>
+            <p class="eyebrow">Booking summary</p>
+            <h2 class="section-title" style="font-size: 1.8rem;">Review your stay before payment.</h2>
+          </div>
+
+          <div class="price-breakdown">
+            <div class="price-row" *ngIf="property.hotel_name">
               <span class="text-muted">Hotel</span>
-              <span class="text-dark font-medium text-right">{{ property.hotel_name }}</span>
+              <span>{{ property.hotel_name }}</span>
             </div>
-            <div class="flex justify-between gap-4">
+            <div class="price-row">
               <span class="text-muted">Property</span>
-              <span class="text-dark font-medium text-right">{{ property.name }}</span>
+              <span>{{ property.name }}</span>
             </div>
-            <div class="flex justify-between gap-4">
+            <div class="price-row">
               <span class="text-muted">Type</span>
-              <span class="text-dark text-right uppercase">{{ type }}</span>
+              <span>{{ type }}</span>
             </div>
-            <div class="flex justify-between gap-4">
+            <div class="price-row">
               <span class="text-muted">Check-in</span>
-              <span class="text-dark text-right">{{ formatDate(checkIn) }}</span>
+              <span>{{ formatDate(checkIn) }}</span>
             </div>
-            <div class="flex justify-between gap-4">
+            <div class="price-row">
               <span class="text-muted">Check-out</span>
-              <span class="text-dark text-right">{{ formatDate(checkOut) }}</span>
+              <span>{{ formatDate(checkOut) }}</span>
             </div>
-            <div class="flex justify-between gap-4">
+            <div class="price-row">
               <span class="text-muted">Guests</span>
-              <span class="text-dark text-right">{{ guests }}</span>
+              <span>{{ guests }}</span>
             </div>
-            <div class="flex justify-between gap-4">
+            <div class="price-row">
               <span class="text-muted">Nights</span>
-              <span class="text-dark text-right">{{ nights }}</span>
+              <span>{{ nights }}</span>
             </div>
-            <div class="flex justify-between gap-4">
-              <span class="text-muted">Downpayment (Pay Now)</span>
-              <span class="text-dark text-right">{{ registrationTotal | currencyInr }}</span>
+          </div>
+
+          <div class="price-breakdown">
+            <div class="price-row">
+              <span class="text-muted">Pay now</span>
+              <strong>{{ registrationTotal | currencyInr }}</strong>
             </div>
-            <div class="flex justify-between gap-4">
-              <span class="text-muted">Balance Due on Arrival</span>
-              <span class="text-dark text-right">{{ arrivalTotal | currencyInr }} (Cash only)</span>
+            <div class="price-row">
+              <span class="text-muted">Pay on arrival</span>
+              <span>{{ arrivalTotal | currencyInr }}</span>
             </div>
-            <div class="flex justify-between gap-4 font-semibold">
+            <div class="price-row">
               <span class="text-muted">Total</span>
-              <span class="text-dark text-right">{{ totalPrice | currencyInr }}</span>
+              <strong>{{ totalPrice | currencyInr }}</strong>
             </div>
           </div>
         </aside>
@@ -206,10 +219,7 @@ export class BookingComponent {
 
   private loadProperty(): void {
     this.loading = true;
-    const request =
-      this.type === 'room'
-        ? this.roomService.getRoom(this.propertyId)
-        : this.tentService.getTent(this.propertyId);
+    const request = this.type === 'room' ? this.roomService.getRoom(this.propertyId) : this.tentService.getTent(this.propertyId);
 
     request.subscribe({
       next: (property) => {
@@ -290,10 +300,7 @@ export class BookingComponent {
           this.isLoggedIn = true;
           const generatedCredentials = phoneLoginResult.generatedCredentials;
           if (generatedCredentials) {
-            sessionStorage.setItem(
-              `generated_credentials_${booking.id}`,
-              JSON.stringify(generatedCredentials)
-            );
+            sessionStorage.setItem(`generated_credentials_${booking.id}`, JSON.stringify(generatedCredentials));
           }
           this.toast.success('Booking confirmed. Continue to payment.');
           this.router.navigate(['/payment', booking.id], {
